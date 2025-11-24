@@ -346,13 +346,54 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        
+        /* Route styling */
+        .route-info {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .route-info h3 {
+            color: var(--primary);
+            margin-bottom: 10px;
+        }
+        
+        .route-details {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        
+        .route-distance, .route-time {
+            font-weight: bold;
+        }
+        
+        .route-distance {
+            color: var(--accent);
+        }
+        
+        .route-time {
+            color: var(--success);
+        }
+        
+        .route-steps {
+            margin-top: 10px;
+            padding-left: 20px;
+        }
+        
+        .route-steps li {
+            margin-bottom: 5px;
+        }
     </style>
 </head>
 <body>
     <header>
         <div class="container">
             <h1><i class="fas fa-map-marked-alt"></i> Evacuation Routes & Emergency Maps</h1>
-            <p>Find safe routes and critical resources during emergencies</p>
+            <p>Find safe routes and critical resources during emergencies in Northern India</p>
         </div>
     </header>
     
@@ -367,13 +408,13 @@
                 <h2>Find Safe Routes</h2>
                 <div class="form-group">
                     <label for="current-location">Your Location</label>
-                    <input type="text" id="current-location" placeholder="Enter address or use current location">
+                    <input type="text" id="current-location" placeholder="Enter address or use current location" value="Connaught Place, New Delhi">
                 </div>
                 <div class="form-group">
                     <label for="destination">Destination</label>
                     <select id="destination">
                         <option value="">Select destination type</option>
-                        <option value="shelter">Emergency Shelter</option>
+                        <option value="shelter" selected>Emergency Shelter</option>
                         <option value="hospital">Hospital</option>
                         <option value="fire">Fire Station</option>
                         <option value="police">Police Station</option>
@@ -385,7 +426,7 @@
                     <input type="text" id="custom-location" placeholder="Enter specific address">
                 </div>
                 <button class="btn" id="find-route-btn">Find Safest Route</button>
-                <button class="btn btn-warning" id="emergency-btn"><i class="fas fa-phone-alt"></i> Call Emergency Services</button>
+                <button class="btn btn-warning" id="emergency-btn"><i class="fas fa-phone-alt"></i> Call Emergency Services (112)</button>
             </div>
             
             <div class="resource-finder">
@@ -402,9 +443,22 @@
                 </div>
                 <div class="form-group">
                     <label for="resource-location">Near</label>
-                    <input type="text" id="resource-location" placeholder="Enter location">
+                    <input type="text" id="resource-location" placeholder="Enter location" value="Delhi">
                 </div>
                 <button class="btn" id="find-resources-btn">Find Resources</button>
+            </div>
+        </div>
+        
+        <div id="route-info-container" style="display: none;">
+            <div class="route-info">
+                <h3>Recommended Evacuation Route</h3>
+                <div class="route-details">
+                    <span class="route-distance">Distance: <span id="route-distance">5.2 km</span></span>
+                    <span class="route-time">Estimated Time: <span id="route-time">15 min</span></span>
+                </div>
+                <ol class="route-steps" id="route-steps">
+                    <!-- Route steps will be populated by JavaScript -->
+                </ol>
             </div>
         </div>
         
@@ -429,26 +483,26 @@
             <div class="shelter-grid" id="shelter-grid">
                 <!-- Shelter cards will be populated by JavaScript -->
                 <div class="shelter-card">
-                    <div class="shelter-name">Central Community Shelter</div>
-                    <div class="shelter-address">123 Main St, Cityville</div>
+                    <div class="shelter-name">Delhi Disaster Relief Shelter</div>
+                    <div class="shelter-address">Rajiv Chowk, Connaught Place, New Delhi</div>
                     <div class="shelter-meta">
-                        <span class="shelter-distance">1.2 miles away</span>
+                        <span class="shelter-distance">0.5 km away</span>
                         <span class="shelter-capacity">Capacity: 120/150</span>
                     </div>
                 </div>
                 <div class="shelter-card">
-                    <div class="shelter-name">Northside High School</div>
-                    <div class="shelter-address">456 Oak Ave, Cityville</div>
+                    <div class="shelter-name">Red Cross Emergency Center</div>
+                    <div class="shelter-address">Barakhamba Road, New Delhi</div>
                     <div class="shelter-meta">
-                        <span class="shelter-distance">2.5 miles away</span>
+                        <span class="shelter-distance">1.2 km away</span>
                         <span class="shelter-capacity">Capacity: 85/200</span>
                     </div>
                 </div>
                 <div class="shelter-card">
-                    <div class="shelter-name">Westside Community Center</div>
-                    <div class="shelter-address">789 Pine Rd, Cityville</div>
+                    <div class="shelter-name">NDMA Relief Camp</div>
+                    <div class="shelter-address">Jantar Mantar Road, New Delhi</div>
                     <div class="shelter-meta">
-                        <span class="shelter-distance">3.1 miles away</span>
+                        <span class="shelter-distance">1.8 km away</span>
                         <span class="shelter-capacity">Capacity: 45/100</span>
                     </div>
                 </div>
@@ -467,8 +521,8 @@
             <div class="resource-content active" id="medical-content">
                 <div class="resource-item">
                     <div class="resource-info">
-                        <h4>City General Hospital</h4>
-                        <p>24/7 Emergency Services | 1.5 miles away</p>
+                        <h4>AIIMS Hospital</h4>
+                        <p>24/7 Emergency Services | 3.5 km away</p>
                     </div>
                     <div class="resource-action">
                         <button class="btn">Get Directions</button>
@@ -476,8 +530,8 @@
                 </div>
                 <div class="resource-item">
                     <div class="resource-info">
-                        <h4>Urgent Care Center</h4>
-                        <p>Open until 10pm | 0.8 miles away</p>
+                        <h4>Safdarjung Hospital</h4>
+                        <p>24/7 Emergency Services | 4.2 km away</p>
                     </div>
                     <div class="resource-action">
                         <button class="btn">Get Directions</button>
@@ -488,8 +542,17 @@
             <div class="resource-content" id="rescue-content">
                 <div class="resource-item">
                     <div class="resource-info">
-                        <h4>Fire Station #12</h4>
-                        <p>24/7 Emergency Response | 1.2 miles away</p>
+                        <h4>Delhi Fire Station</h4>
+                        <p>24/7 Emergency Response | 1.5 km away</p>
+                    </div>
+                    <div class="resource-action">
+                        <button class="btn">Get Directions</button>
+                    </div>
+                </div>
+                <div class="resource-item">
+                    <div class="resource-info">
+                        <h4>NDRF Unit Delhi</h4>
+                        <p>Disaster Response Team | 5.8 km away</p>
                     </div>
                     <div class="resource-action">
                         <button class="btn">Get Directions</button>
@@ -501,7 +564,16 @@
                 <div class="resource-item">
                     <div class="resource-info">
                         <h4>Red Cross Food Distribution</h4>
-                        <p>Daily meals available | 2.1 miles away</p>
+                        <p>Daily meals available | 2.1 km away</p>
+                    </div>
+                    <div class="resource-action">
+                        <button class="btn">Get Directions</button>
+                    </div>
+                </div>
+                <div class="resource-item">
+                    <div class="resource-info">
+                        <h4>Gurudwara Bangla Sahib</h4>
+                        <p>Community Kitchen | 1.0 km away</p>
                     </div>
                     <div class="resource-action">
                         <button class="btn">Get Directions</button>
@@ -512,8 +584,17 @@
             <div class="resource-content" id="shelter-content">
                 <div class="resource-item">
                     <div class="resource-info">
-                        <h4>Central Community Shelter</h4>
-                        <p>Open 24/7 during emergencies | 1.2 miles away</p>
+                        <h4>Delhi Disaster Relief Shelter</h4>
+                        <p>Open 24/7 during emergencies | 0.5 km away</p>
+                    </div>
+                    <div class="resource-action">
+                        <button class="btn">Get Directions</button>
+                    </div>
+                </div>
+                <div class="resource-item">
+                    <div class="resource-info">
+                        <h4>Yamuna Sports Complex</h4>
+                        <p>Emergency Shelter | 6.3 km away</p>
                     </div>
                     <div class="resource-action">
                         <button class="btn">Get Directions</button>
@@ -525,44 +606,47 @@
     
     <footer>
         <div class="footer-links">
-            <a href="#">Home</a>
-            <a href="#">Donations</a>
-            <a href="#">Missing Persons</a>
-            <a href="#">Emergency Contacts</a>
-            <a href="#">About Us</a>
+            <a href="./index.html">Home</a>
+            <a href="./donation.html">Donations</a>
+            <a href="./missing.html">Missing Persons</a>
+            <a href="./emergency.html">Emergency Contacts</a>
+            <a href="./aboutus.html">About Us</a>
         </div>
         <p>Disaster Relief Network &copy; 2023 | All Rights Reserved</p>
-        <p>For emergency assistance, please call your local emergency number</p>
+        <p>For emergency assistance, please call 112 (India Emergency Number)</p>
     </footer>
 
     <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
     <script>
-        // Initialize the map
-        const map = L.map('map').setView([51.505, -0.09], 13);
+        // Initialize the map centered on Delhi
+        const map = L.map('map').setView([28.6139, 77.2090], 13);
         
         // Add OpenStreetMap tiles
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(map);
         
-        // Sample markers for demonstration
+        // Sample markers for Northern India (Delhi area)
         const shelters = [
-            { name: "Central Community Shelter", lat: 51.505, lng: -0.09, capacity: "120/150" },
-            { name: "Northside High School", lat: 51.51, lng: -0.1, capacity: "85/200" },
-            { name: "Westside Community Center", lat: 51.515, lng: -0.1, capacity: "45/100" }
+            { name: "Delhi Disaster Relief Shelter", lat: 28.6315, lng: 77.2167, capacity: "120/150", address: "Rajiv Chowk, Connaught Place, New Delhi" },
+            { name: "Red Cross Emergency Center", lat: 28.6275, lng: 77.2250, capacity: "85/200", address: "Barakhamba Road, New Delhi" },
+            { name: "NDMA Relief Camp", lat: 28.6270, lng: 77.2120, capacity: "45/100", address: "Jantar Mantar Road, New Delhi" }
         ];
         
         const hospitals = [
-            { name: "City General Hospital", lat: 51.5, lng: -0.085 },
-            { name: "Urgent Care Center", lat: 51.495, lng: -0.095 }
+            { name: "AIIMS Hospital", lat: 28.5670, lng: 77.2110, address: "Ansari Nagar, New Delhi" },
+            { name: "Safdarjung Hospital", lat: 28.5675, lng: 77.2050, address: "Ansari Nagar East, New Delhi" }
         ];
         
         const fireStations = [
-            { name: "Fire Station #12", lat: 51.51, lng: -0.08 }
+            { name: "Delhi Fire Station", lat: 28.6200, lng: 77.2200, address: "Connaught Place, New Delhi" },
+            { name: "NDRF Unit Delhi", lat: 28.5500, lng: 77.2500, address: "Saket, New Delhi" }
         ];
         
         const policeStations = [
-            { name: "Central Police Station", lat: 51.495, lng: -0.1 }
+            { name: "Connaught Place Police Station", lat: 28.6320, lng: 77.2190, address: "Connaught Place, New Delhi" },
+            { name: "Parliament Street Police Station", lat: 28.6220, lng: 77.2080, address: "Parliament Street, New Delhi" }
         ];
         
         // Create layer groups
@@ -574,25 +658,25 @@
         // Add markers to layers
         shelters.forEach(shelter => {
             const marker = L.marker([shelter.lat, shelter.lng])
-                .bindPopup(`<b>${shelter.name}</b><br>Capacity: ${shelter.capacity}`);
+                .bindPopup(`<b>${shelter.name}</b><br>${shelter.address}<br>Capacity: ${shelter.capacity}`);
             shelterLayer.addLayer(marker);
         });
         
         hospitals.forEach(hospital => {
             const marker = L.marker([hospital.lat, hospital.lng], { icon: createIcon('hospital') })
-                .bindPopup(`<b>${hospital.name}</b><br>24/7 Emergency Services`);
+                .bindPopup(`<b>${hospital.name}</b><br>${hospital.address}<br>24/7 Emergency Services`);
             hospitalLayer.addLayer(marker);
         });
         
         fireStations.forEach(station => {
             const marker = L.marker([station.lat, station.lng], { icon: createIcon('fire') })
-                .bindPopup(`<b>${station.name}</b><br>Emergency Response`);
+                .bindPopup(`<b>${station.name}</b><br>${station.address}<br>Emergency Response`);
             fireLayer.addLayer(marker);
         });
         
         policeStations.forEach(station => {
             const marker = L.marker([station.lat, station.lng], { icon: createIcon('police') })
-                .bindPopup(`<b>${station.name}</b><br>Police Services`);
+                .bindPopup(`<b>${station.name}</b><br>${station.address}<br>Police Services`);
             policeLayer.addLayer(marker);
         });
         
@@ -625,6 +709,9 @@
                 popupAnchor: [0, -iconSize[1]/2]
             });
         }
+        
+        // Routing control
+        let routingControl = null;
         
         // Map overlay controls
         document.getElementById('show-shelters').addEventListener('click', function() {
@@ -687,22 +774,110 @@
         // Find route button
         document.getElementById('find-route-btn').addEventListener('click', function() {
             const loading = document.getElementById('loading-indicator');
-            loading.style.display = 'block';
+            const routeInfoContainer = document.getElementById('route-info-container');
+            const routeSteps = document.getElementById('route-steps');
             
-            // Simulate API call
+            loading.style.display = 'block';
+            routeInfoContainer.style.display = 'none';
+            
+            // Clear previous route if exists
+            if (routingControl) {
+                map.removeControl(routingControl);
+                routingControl = null;
+            }
+            
+            // Get selected destination type
+            const destinationType = document.getElementById('destination').value;
+            let destinationCoords;
+            let destinationName;
+            
+            // Determine destination based on selection
+            if (destinationType === 'custom') {
+                const customLocation = document.getElementById('custom-location').value;
+                if (!customLocation) {
+                    alert('Please enter a custom location');
+                    loading.style.display = 'none';
+                    return;
+                }
+                // In a real app, you would geocode this address
+                // For demo, we'll use a fixed location near Delhi
+                destinationCoords = [28.6100, 77.2300];
+                destinationName = customLocation;
+            } else {
+                // Use predefined locations for demo
+                switch(destinationType) {
+                    case 'shelter':
+                        destinationCoords = [shelters[0].lat, shelters[0].lng];
+                        destinationName = shelters[0].name;
+                        break;
+                    case 'hospital':
+                        destinationCoords = [hospitals[0].lat, hospitals[0].lng];
+                        destinationName = hospitals[0].name;
+                        break;
+                    case 'fire':
+                        destinationCoords = [fireStations[0].lat, fireStations[0].lng];
+                        destinationName = fireStations[0].name;
+                        break;
+                    case 'police':
+                        destinationCoords = [policeStations[0].lat, policeStations[0].lng];
+                        destinationName = policeStations[0].name;
+                        break;
+                    default:
+                        alert('Please select a destination type');
+                        loading.style.display = 'none';
+                        return;
+                }
+            }
+            
+            // For demo purposes, we'll use Connaught Place as starting point
+            const startCoords = [28.6315, 77.2167];
+            const startName = "Connaught Place";
+            
+            // Simulate API call with timeout
             setTimeout(() => {
                 loading.style.display = 'none';
                 
-                // In a real app, you would draw the route on the map here
-                alert('Route calculation would appear here. In a real app, this would connect to a routing API.');
-            }, 2000);
+                // Draw route on map
+                routingControl = L.Routing.control({
+                    waypoints: [
+                        L.latLng(startCoords[0], startCoords[1]),
+                        L.latLng(destinationCoords[0], destinationCoords[1])
+                    ],
+                    routeWhileDragging: true,
+                    show: false // Hide the default instructions panel
+                }).addTo(map);
+                
+                // Zoom to fit the route
+                map.fitBounds([
+                    [startCoords[0], startCoords[1]],
+                    [destinationCoords[0], destinationCoords[1]]
+                ]);
+                
+                // Show route information
+                document.getElementById('route-distance').textContent = '5.2 km';
+                document.getElementById('route-time').textContent = '15 min';
+                
+                // Add sample route steps
+                routeSteps.innerHTML = `
+                    <li>Start at ${startName}</li>
+                    <li>Head northeast on Parliament Street toward Connaught Place</li>
+                    <li>Turn right onto Janpath Road</li>
+                    <li>Continue straight for 1.2 km</li>
+                    <li>Turn left onto Kasturba Gandhi Marg</li>
+                    <li>Destination ${destinationName} will be on the right</li>
+                    <li>Follow emergency personnel instructions upon arrival</li>
+                `;
+                
+                routeInfoContainer.style.display = 'block';
+                
+            }, 1500);
         });
         
         // Emergency button
         document.getElementById('emergency-btn').addEventListener('click', function() {
-            if (confirm('Are you sure you want to call emergency services?')) {
+            if (confirm('Are you sure you want to call emergency services (112)?')) {
                 // In a real app, this would initiate a phone call
-                alert('In a real app, this would call emergency services.');
+                alert('In a real app, this would call emergency services at 112.');
             }
         });
         
@@ -729,12 +904,16 @@
             // Simulate API call
             setTimeout(() => {
                 loading.style.display = 'none';
-                alert('Resources would be displayed here. In a real app, this would fetch real data.');
+                // In a real app, this would update the resource lists
+                alert('Resources have been updated based on your location. In a real app, this would fetch real data.');
             }, 1500);
         });
         
-        // Geolocation button would be implemented here
-        // In a real app, you would use navigator.geolocation.getCurrentPosition()
+        // Show shelters by default when page loads
+        window.addEventListener('load', function() {
+            shelterLayer.addTo(map);
+            document.getElementById('show-shelters').classList.add('active');
+        });
     </script>
 </body>
 </html>

@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Report Disaster - Admin</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #3b82f6;
+            --primary-dark: #2563eb;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --safe: #10b981;
+            --dark: #1e293b;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background: #f1f5f9;
+            color: var(--dark);
+        }
+
+        header {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            padding: 2rem 1rem;
+            text-align: center;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 0 1.5rem;
+        }
+
+        .form-card {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 1rem;
+        }
+
+        textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+        }
+
+        .alert-list {
+            margin-top: 3rem;
+        }
+
+        .alert-item {
+            background: white;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border-radius: 8px;
+            border-left: 4px solid var(--primary);
+            display: flex;
+            justify-content: between;
+            align-items: center;
+        }
+
+        .alert-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Report Disaster - Admin Panel</h1>
+        <p>Create and manage emergency alerts</p>
+    </header>
+
+    <div class="container">
+        <div class="form-card">
+            <h2>Create New Alert</h2>
+            <form method="POST" action="/admin/report-disaster">
+                <div class="form-group">
+                    <label for="title">Alert Title</label>
+                    <input type="text" id="title" name="title" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="type">Disaster Type</label>
+                    <select id="type" name="type" required>
+                        <option value="">Select Type</option>
+                        <option value="Flood">Flood</option>
+                        <option value="Earthquake">Earthquake</option>
+                        <option value="Cyclone">Cyclone</option>
+                        <option value="Wildfire">Wildfire</option>
+                        <option value="Heat Wave">Heat Wave</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="severity">Severity Level</label>
+                    <select id="severity" name="severity" required>
+                        <option value="LOW">Low</option>
+                        <option value="MEDIUM">Medium</option>
+                        <option value="HIGH">High</option>
+                        <option value="CRITICAL">Critical</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="affected_areas">Affected Areas</label>
+                    <textarea id="affected_areas" name="affected_areas" required></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="timeframe_start">Timeframe Start</label>
+                    <input type="date" id="timeframe_start" name="timeframe_start">
+                </div>
+
+                <div class="form-group">
+                    <label for="timeframe_end">Timeframe End</label>
+                    <input type="date" id="timeframe_end" name="timeframe_end">
+                </div>
+
+                <div class="form-group">
+                    <label for="advisory">Advisory Information</label>
+                    <textarea id="advisory" name="advisory" required></textarea>
+                </div>
+
+                <button type="submit" class="btn btn-primary">Create Alert</button>
+            </form>
+        </div>
+
+        {% if existing_alerts %}
+        <div class="alert-list">
+            <h2>Existing Alerts</h2>
+            {% for alert in existing_alerts %}
+            <div class="alert-item">
+                <div>
+                    <h3>{{ alert.title }} <span class="severity-{{ alert.severity|lower }}">({{ alert.severity }})</span></h3>
+                    <p>{{ alert.affected_areas }}</p>
+                </div>
+                <div class="alert-actions">
+                    <form method="POST" action="/admin/delete-alert/{{ alert.id }}" style="display: inline;">
+                        <button type="submit" class="btn btn-danger">Delete</button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>

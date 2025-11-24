@@ -37,14 +37,13 @@ init_db()
 
 # Email configuration (using your credentials)
 EMAIL_CONFIG = {
-    'sender_email': "sukritti3406.beai24@chitkara.edu.in",
-    'sender_password': "swxs xpaz aift rlkd",
+    'sender_email': "nayamatemeet@gmail.com",
+    'sender_password': "tjoy glyv olws wdxv",
     'smtp_server': "smtp.gmail.com",
     'smtp_port': 465,
     'use_ssl': True
 }
 
-# ... (previous imports remain the same)
 
 def send_alert_email(to_email, location, alert_message):
     """Send emergency alert email to a user"""
@@ -60,28 +59,31 @@ def send_alert_email(to_email, location, alert_message):
     Stay safe,
     Disaster Management Team
     """
-    
     msg = MIMEText(body)
     msg['Subject'] = subject
     msg['From'] = EMAIL_CONFIG['sender_email']
     msg['To'] = to_email
     
     try:
-        if EMAIL_CONFIG.get('use_ssl', False):
-            # Using SMTP_SSL for secure connection
-            with smtplib.SMTP_SSL(EMAIL_CONFIG['smtp_server'], EMAIL_CONFIG['smtp_port']) as server:
-                server.login(EMAIL_CONFIG['sender_email'], EMAIL_CONFIG['sender_password'])
-                server.send_message(msg)
-        else:
-            # Regular SMTP with STARTTLS
-            with smtplib.SMTP(EMAIL_CONFIG['smtp_server'], EMAIL_CONFIG['smtp_port']) as server:
-                server.starttls()
-                server.login(EMAIL_CONFIG['sender_email'], EMAIL_CONFIG['sender_password'])
-                server.send_message(msg)
+        # Try STARTTLS first
+        with smtplib.SMTP(EMAIL_CONFIG['smtp_server'], 587) as server:
+            server.starttls()
+            server.login(EMAIL_CONFIG['sender_email'], EMAIL_CONFIG['sender_password'])
+            server.send_message(msg)
+            print(f"Email sent to {to_email} using STARTTLS.")
         return True
     except Exception as e:
-        print(f"Failed to send email to {to_email}: {str(e)}")
-        # Print full error details for debugging
+        print(f"STARTTLS failed: {e}")
+    
+    try:
+        # Fallback to SSL
+        with smtplib.SMTP_SSL(EMAIL_CONFIG['smtp_server'], EMAIL_CONFIG['smtp_port']) as server:
+            server.login(EMAIL_CONFIG['sender_email'], EMAIL_CONFIG['sender_password'])
+            server.send_message(msg)
+            print(f"Email sent to {to_email} using SMTP_SSL.")
+        return True
+    except Exception as e:
+        print(f"SMTP_SSL also failed: {e}")
         import traceback
         traceback.print_exc()
         return False
@@ -245,8 +247,7 @@ def missing():
 
 @app.route('/protection')
 def protection():
-    return render_template('protecthome.html')  # Assuming the full name is protectionne.html
-
+    return render_template('protecthome.html')  
 @app.route('/routes')
 def routes():
     return render_template('routes.html')

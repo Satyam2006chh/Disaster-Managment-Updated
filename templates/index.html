@@ -8,8 +8,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&family=Roboto+Condensed:wght@700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-   <link rel="shortcut icon" href="./images/logo.jpeg" type="image/x-icon">
-   
+    <link rel="shortcut icon" href="./images/logo.jpeg" type="image/x-icon">
 </head>
 <style>
   /* Base Styles */
@@ -357,90 +356,74 @@ img {
     box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
 }
 
+#disasterMap {
+    height: 500px;
+    width: 100%;
+    border-radius: 8px;
+    z-index: 1;
+}
 
-    #disasterMap {
-        height: 500px;
-        width: 100%;
-        border-radius: 8px;
-        z-index: 1;
-    }
-    
-    .map-container {
-        position: relative;
-        margin-bottom: 1rem;
-    }
-    
-    .map-controls {
-        position: absolute;
-        top: 10px;
-        left: 10px;
-        z-index: 1000;
-        display: flex;
-        gap: 5px;
-    }
-    
-    .control-btn {
-        padding: 6px 12px;
-        background: white;
-        border: 1px solid #ddd;
-        border-radius: 4px;
-        cursor: pointer;
-        font-size: 14px;
-        box-shadow: 0 1px 5px rgba(0,0,0,0.1);
-    }
-    
-    .control-btn.active {
-        background: #2c3e50;
-        color: white;
-        border-color: #2c3e50;
-    }
-    
-    .map-legend {
-        position: absolute;
-        bottom: 20px;
-        right: 10px;
-        z-index: 1000;
-        background: white;
-        padding: 10px;
-        border-radius: 4px;
-        box-shadow: 0 1px 5px rgba(0,0,0,0.1);
-    }
-    
-    .legend-item {
-        margin: 5px 0;
-        display: flex;
-        align-items: center;
-    }
-    
-    .legend-item .icon {
-        margin-right: 8px;
-        font-size: 18px;
-    }
-    
-    .refresh-btn {
-        margin-left: 10px;
-        background: #f8f9fa;
-        border: 1px solid #ddd;
-        border-radius: 4px;
-        padding: 2px 8px;
-        cursor: pointer;
-    }
 .map-container {
     position: relative;
-    height: 400px;
+    margin-bottom: 1rem;
 }
 
-.map {
-    width: 100%;
-    height: 100%;
-    background-color: #e8f4f8;
-    position: relative;
+.map-controls {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 1000;
+    display: flex;
+    gap: 5px;
 }
-#disasterMap {
-    height: 500px;  /* Absolute must-have */
-    width: 100%;
-    z-index: 1;  /* Ensures map appears above other elements */
+
+.control-btn {
+    padding: 6px 12px;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    box-shadow: 0 1px 5px rgba(0,0,0,0.1);
 }
+
+.control-btn.active {
+    background: #2c3e50;
+    color: white;
+    border-color: #2c3e50;
+}
+
+.map-legend {
+    position: absolute;
+    bottom: 20px;
+    right: 10px;
+    z-index: 1000;
+    background: white;
+    padding: 10px;
+    border-radius: 4px;
+    box-shadow: 0 1px 5px rgba(0,0,0,0.1);
+}
+
+.legend-item {
+    margin: 5px 0;
+    display: flex;
+    align-items: center;
+}
+
+.legend-item .icon {
+    margin-right: 8px;
+    font-size: 18px;
+}
+
+.refresh-btn {
+    margin-left: 10px;
+    background: #f8f9fa;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 2px 8px;
+    cursor: pointer;
+}
+
 .map-overlay {
     position: absolute;
     bottom: 20px;
@@ -1008,6 +991,20 @@ img {
     background: var(--primary);
     color: white;
 }
+
+/* Custom Leaflet marker styles */
+.earthquake-icon, .flood-icon, .wildfire-icon, .hurricane-icon {
+    font-size: 24px !important;
+    text-align: center;
+    line-height: 1;
+}
+
+/* Ensure map container has proper dimensions */
+#disasterMap {
+    height: 500px;
+    width: 100%;
+    z-index: 1;
+}
 </style>
 <body>
  <!-- Header/Navigation -->
@@ -1021,7 +1018,6 @@ img {
             <ul>
                 <li><a href="{{url_for('home')}}">Home</a></li>
                 <li><a href="{{url_for('admin_login')}}">Send Alerts</a></li>
-                
                 <li><a href="{{url_for('about')}}">About</a></li>
                 <li><a href="{{url_for('register')}}">Register</a></li>
                 <li>
@@ -1069,73 +1065,12 @@ img {
                 </div>
                 
                 <!-- Map Div (must have defined height) -->
-                <div class="map" id="disasterMap"></div>
+                <div id="disasterMap"></div>
                 
-                <!-- Map Overlay Elements -->
-                <div class="map-overlay">
-                    <div class="map-legend">
-                        <h4>Threat Legend</h4>
-                        <div class="legend-item"><span class="icon earthquake">🟠</span> Earthquake</div>
-                        <div class="legend-item"><span class="icon flood">🔵</span> Flood</div>
-                        <div class="legend-item"><span class="icon wildfire">🟡</span> Wildfire</div>
-                        <div class="legend-item"><span class="icon hurricane">🔴</span> Hurricane</div>
-                        <div class="legend-item"><span class="icon warning">⚠️</span> Early Warning</div>
-                    </div>
-                    <div class="map-tooltip" id="mapTooltip"></div>
-                </div>
-                
-                <!-- Map Initialization Script -->
-                <script>
-                    // Initialize map centered on India
-                    const map = L.map('disasterMap').setView([20.5937, 78.9629], 5);
-                    
-                    // Add OpenStreetMap base layer
-                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-                        maxZoom: 18
-                    }).addTo(map);
-                    
-                    // Sample markers for different threat types
-                    const earthquakeIcon = L.divIcon({ className: 'earthquake-icon', html: '🌋' });
-                    const floodIcon = L.divIcon({ className: 'flood-icon', html: '🌊' });
-                    const wildfireIcon = L.divIcon({ className: 'wildfire-icon', html: '🔥' });
-                    const hurricaneIcon = L.divIcon({ className: 'hurricane-icon', html: '🌀' });
-                    
-                    // Add sample markers
-                    L.marker([19.0760, 72.8777], { icon: earthquakeIcon }) // Mumbai
-                        .addTo(map)
-                        .bindPopup("<b>Earthquake Alert</b><br>Magnitude 4.5");
-                    
-                    L.marker([28.6139, 77.2090], { icon: floodIcon }) // Delhi
-                        .addTo(map)
-                        .bindPopup("<b>Flood Warning</b><br>Yamuna River overflow");
-                    
-                    L.marker([12.9716, 77.5946], { icon: wildfireIcon }) // Bengaluru
-                        .addTo(map)
-                        .bindPopup("<b>Wildfire Alert</b><br>Bandipur National Park");
-                    
-                    L.marker([13.0827, 80.2707], { icon: hurricaneIcon }) // Chennai
-                        .addTo(map)
-                        .bindPopup("<b>Cyclone Warning</b><br>Approaching from Bay of Bengal");
-                    
-                    // Layer control functionality
-                    document.querySelectorAll('.control-btn').forEach(btn => {
-                        btn.addEventListener('click', function() {
-                            document.querySelectorAll('.control-btn').forEach(b => b.classList.remove('active'));
-                            this.classList.add('active');
-                            // Here you would add actual layer filtering logic
-                            console.log('Showing layer:', this.dataset.layer);
-                        });
-                    });
-                    
-                    // Update last updated time
-                    document.getElementById('lastUpdated').textContent = new Date().toLocaleTimeString();
-                </script>
-            </div>
+               
             
             <!-- Stats Ticker -->
             <div class="stats-ticker">
-                <h3>Real-time Statistics</h3>
                 <div class="ticker-container">
                     <div class="ticker-item">
                         <span class="number" id="activeDisasters">4</span>
@@ -1341,7 +1276,8 @@ img {
         </div>
     </footer>
 
-<script>document.addEventListener('DOMContentLoaded', function() {
+<script>
+document.addEventListener('DOMContentLoaded', function() {
     // Mobile Menu Toggle
     const mobileMenuBtn = document.querySelector('.mobile-menu');
     const nav = document.querySelector('.nav ul');
@@ -1369,43 +1305,90 @@ img {
         });
     };
 
-    // Initialize disaster map (simplified for demo)
+    // Initialize disaster map with Leaflet
     const initMap = () => {
-        const map = document.getElementById('disasterMap');
-        // In a real implementation, this would use Google Maps API or similar
-        map.innerHTML = '<div class="map-placeholder" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#e8f4f8;color:#7f8c8d;font-weight:bold;">Interactive Disaster Map Would Display Here</div>';
-    };
-    const map = L.map('disasterMap').setView([20.5937, 78.9629], 5); // Centered on India
-    
-    // Add tile layer (OpenStreetMap)
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-    }).addTo(map);
-
-    // Sample markers for different threats (replace with real data)
-    L.marker([19.0760, 72.8777], { 
-        icon: L.divIcon({className: 'earthquake-icon', html: '🌋'}) 
-    }).addTo(map).bindPopup("Mumbai: Earthquake Alert (4.5 magnitude)");
-
-    L.marker([28.6139, 77.2090], { 
-        icon: L.divIcon({className: 'flood-icon', html: '🌊'}) 
-    }).addTo(map).bindPopup("Delhi: Flood Warning");
-    L.marker([12.9716, 77.5946], { 
-        icon: L.divIcon({className: 'wildfire-icon', html: '🔥'}) 
-    }).addTo(map).bindPopup("Bengaluru: Wildfire Reported");
-
-    // Add layer control functionality
-    document.querySelectorAll('.control-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            document.querySelectorAll('.control-btn').forEach(b => b.classList.remove('active'));
-            this.classList.add('active');
-            // Here you would implement layer filtering logic
+        // Center on Northern India (approx. Delhi coordinates)
+        const map = L.map('disasterMap').setView([28.6139, 77.2090], 6);
+        
+        // Add tile layer (OpenStreetMap)
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            maxZoom: 18
+        }).addTo(map);
+        
+        // Custom icons for different disaster types
+        const earthquakeIcon = L.divIcon({
+            className: 'earthquake-icon',
+            html: '🌋',
+            iconSize: [30, 30]
         });
-    });
+        
+        const floodIcon = L.divIcon({
+            className: 'flood-icon',
+            html: '🌊',
+            iconSize: [30, 30]
+        });
+        
+        const wildfireIcon = L.divIcon({
+            className: 'wildfire-icon',
+            html: '🔥',
+            iconSize: [30, 30]
+        });
+        
+        const hurricaneIcon = L.divIcon({
+            className: 'hurricane-icon',
+            html: '🌀',
+            iconSize: [30, 30]
+        });
+        
+        // Add markers for Northern India locations
+        // Delhi - Flood
+        L.marker([28.6139, 77.2090], { icon: floodIcon })
+            .addTo(map)
+            .bindPopup("<b>Flood Warning</b><br>Yamuna River overflow reported in Delhi. Evacuation orders for low-lying areas.");
+        
+        // Shimla - Earthquake
+        L.marker([31.1048, 77.1734], { icon: earthquakeIcon })
+            .addTo(map)
+            .bindPopup("<b>Earthquake Alert</b><br>Magnitude 4.8 near Shimla. Minor damage reported.");
+        
+        // Chandigarh - Wildfire
+        L.marker([30.7333, 76.7794], { icon: wildfireIcon })
+            .addTo(map)
+            .bindPopup("<b>Wildfire Alert</b><br>Forest fires reported in Shivalik Hills near Chandigarh.");
+        
+        // Jaipur - Heatwave
+        L.marker([26.9124, 75.7873], { icon: L.divIcon({html: '🌡️', iconSize: [30, 30]}) })
+            .addTo(map)
+            .bindPopup("<b>Heatwave Warning</b><br>Extreme temperatures in Rajasthan. Stay hydrated and avoid sun exposure.");
+        
+        // Amritsar - Civil Unrest
+        L.marker([31.6340, 74.8723], { icon: L.divIcon({html: '⚠️', iconSize: [30, 30]}) })
+            .addTo(map)
+            .bindPopup("<b>Civil Unrest</b><br>Protests reported in Amritsar. Avoid affected areas.");
+        
+        // Dehradun - Landslide
+        L.marker([30.3165, 78.0322], { icon: L.divIcon({html: '⛰️', iconSize: [30, 30]}) })
+            .addTo(map)
+            .bindPopup("<b>Landslide Warning</b><br>Heavy rains triggering landslides in Uttarakhand.");
+        
+        // Add layer control functionality
+        document.querySelectorAll('.control-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.control-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                // Here you would implement actual layer filtering logic
+                console.log('Showing layer:', this.dataset.layer);
+            });
+        });
+        
+        // Update last updated time
+        document.getElementById('lastUpdated').textContent = new Date().toLocaleTimeString();
+    };
 
     // SOS Functionality
     const initSOS = () => {
-        const sosButton = document.getElementById('sosButton');
+        const sosButton = document.getElementById('navSosButton');
         if (!sosButton) return;
 
         sosButton.addEventListener('click', function() {
@@ -1413,60 +1396,35 @@ img {
             
             // Add visual feedback
             button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> SENDING SOS...';
-            button.classList.add('sos-active');
             
             // Get user's location
             navigator.geolocation.getCurrentPosition(
                 async (position) => {
                     try {
-                        // Send to backend
-                        const response = await fetch('/api/sos', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'Authorization': localStorage.getItem('disasterToken')
-                            },
-                            body: JSON.stringify({
-                                latitude: position.coords.latitude,
-                                longitude: position.coords.longitude
-                            })
-                        });
-                        
-                        if (!response.ok) throw new Error('Failed to send SOS');
+                        // Simulate sending to backend
+                        console.log('Sending SOS with location:', position.coords.latitude, position.coords.longitude);
                         
                         // Update UI
                         button.innerHTML = '<i class="fas fa-check"></i> SOS SENT! HELP IS COMING';
-                        button.classList.remove('sos-active');
-                        button.classList.add('sos-success');
-                        
-                        // Update map with new SOS marker (would be implemented in real map)
-                        console.log('SOS Location:', position.coords.latitude, position.coords.longitude);
                         
                         // Reset button after 5 seconds
                         setTimeout(() => {
-                            button.innerHTML = '<i class="fas fa-bell"></i> EMERGENCY SOS';
-                            button.classList.remove('sos-success');
+                            button.innerHTML = '<i class="fas fa-bell"></i> SOS';
                         }, 5000);
                         
                     } catch (error) {
                         console.error('SOS Error:', error);
                         button.innerHTML = '<i class="fas fa-exclamation-triangle"></i> SOS FAILED';
-                        button.classList.remove('sos-active');
-                        button.classList.add('sos-error');
                         setTimeout(() => {
-                            button.innerHTML = '<i class="fas fa-bell"></i> EMERGENCY SOS';
-                            button.classList.remove('sos-error');
+                            button.innerHTML = '<i class="fas fa-bell"></i> SOS';
                         }, 3000);
                     }
                 },
                 (error) => {
                     console.error('Geolocation Error:', error);
                     button.innerHTML = '<i class="fas fa-exclamation-triangle"></i> LOCATION ACCESS DENIED';
-                    button.classList.remove('sos-active');
-                    button.classList.add('sos-error');
                     setTimeout(() => {
-                        button.innerHTML = '<i class="fas fa-bell"></i> EMERGENCY SOS';
-                        button.classList.remove('sos-error');
+                        button.innerHTML = '<i class="fas fa-bell"></i> SOS';
                     }, 3000);
                 }
             );
@@ -1500,84 +1458,85 @@ img {
         }, 5000);
     };
 
-    // AI Chatbot functionality
-    const initChatbot = () => {
-        const aiButton = document.getElementById('aiButton');
-        const aiChatbox = document.getElementById('aiChatbox');
-        const closeChat = document.querySelector('.close-chat');
-        const chatMessages = document.getElementById('chatMessages');
-        const userInput = document.getElementById('userInput');
-        const sendMessage = document.getElementById('sendMessage');
-        
-        // Sample responses for the chatbot
-        const botResponses = {
-            "hello": "Hello! How can I help you with disaster preparedness today?",
-            "hi": "Hi there! What disaster-related information are you looking for?",
-            "earthquake": "For earthquakes: DROP to the ground, COVER under sturdy furniture, and HOLD ON until shaking stops. After, check for injuries and gas leaks. More info at <a href='#'>Earthquake Preparedness</a>.",
-            "flood": "For floods: Move to higher ground immediately. Avoid walking or driving through flood waters. Turn off utilities if instructed. More info at <a href='#'>Flood Safety</a>.",
-            "hurricane": "For hurricanes: Board up windows, secure outdoor items, and evacuate if ordered. Have supplies for at least 3 days. More info at <a href='#'>Hurricane Preparedness</a>.",
-            "wildfire": "For wildfires: Close all windows/doors, remove flammable items from around your home, and evacuate if ordered. More info at <a href='#'>Wildfire Safety</a>.",
-            "kit": "A basic emergency kit should include: water (1 gal/person/day), non-perishable food, flashlight, batteries, first aid kit, medications, multi-tool, sanitation items, cash, important documents, and phone chargers.",
-            "plan": "A family emergency plan should include: meeting places, emergency contacts, evacuation routes, pet plans, and special needs considerations. Use our <a href='#'>Family Plan Tool</a> to create one.",
-            "sos": "For emergencies, click the SOS button in the navigation or on the map page. This will alert authorities with your location.",
-            "default": "I can help with information about earthquakes, floods, hurricanes, wildfires, emergency kits, and family plans. What would you like to know?"
-        };
-        
-        // Toggle chatbox visibility
-        aiButton.addEventListener('click', function() {
-            aiChatbox.classList.toggle('active');
-        });
-        
-        closeChat.addEventListener('click', function() {
-            aiChatbox.classList.remove('active');
-        });
-        
-        // Handle sending messages
-        function sendUserMessage() {
-            const message = userInput.value.trim();
-            if (message === '') return;
-            
-            // Add user message to chat
-            addMessage(message, 'user');
-            userInput.value = '';
-            
-            // Simulate bot thinking
-            setTimeout(() => {
-                const response = generateBotResponse(message.toLowerCase());
-                addMessage(response, 'bot');
-            }, 800);
-        }
-        
-        sendMessage.addEventListener('click', sendUserMessage);
-        userInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') sendUserMessage();
-        });
-        
-        // Add message to chat
-        function addMessage(text, sender) {
-            const messageDiv = document.createElement('div');
-            messageDiv.classList.add('message', sender);
-            messageDiv.innerHTML = `<p>${text}</p>`;
-            chatMessages.appendChild(messageDiv);
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-        }
-        
-        // Generate bot response
-        function generateBotResponse(message) {
-            for (const [keyword, response] of Object.entries(botResponses)) {
-                if (message.includes(keyword)) {
-                    return response;
-                }
-            }
-            return botResponses['default'];
-        }
+// AI Chatbot functionality
+const initChatbot = () => {
+    // DOM elements
+    const elements = {
+        aiButton: document.getElementById('aiButton'),
+        aiChatbox: document.getElementById('aiChatbox'),
+        closeChat: document.querySelector('.close-chat'),
+        chatMessages: document.getElementById('chatMessages'),
+        userInput: document.getElementById('userInput'),
+        sendMessage: document.getElementById('sendMessage')
     };
 
-    // Initialize all functionality
-    initMap();
-    testimonialCarousel();
-    initChatbot();
-    initSOS(); // Initialize SOS functionality
+    // Bot responses with priority matching
+    const botResponses = [
+        { keywords: ['hello', 'hi', 'hey'], response: "Hello! How can I help you with disaster preparedness today?" },
+        { keywords: ['earthquake', 'quake'], response: "For earthquakes: DROP to the ground, COVER under sturdy furniture, and HOLD ON until shaking stops. After, check for injuries and gas leaks. More info at <a href='#'>Earthquake Preparedness</a>." },
+        { keywords: ['flood', 'flooding'], response: "For floods: Move to higher ground immediately. Avoid walking or driving through flood waters. Turn off utilities if instructed. More info at <a href='#'>Flood Safety</a>." },
+        { keywords: ['hurricane', 'typhoon'], response: "For hurricanes: Board up windows, secure outdoor items, and evacuate if ordered. Have supplies for at least 3 days. More info at <a href='#'>Hurricane Preparedness</a>." },
+        { keywords: ['wildfire', 'fire', 'forest fire'], response: "For wildfires: Close all windows/doors, remove flammable items from around your home, and evacuate if ordered. More info at <a href='#'>Wildfire Safety</a>." },
+        { keywords: ['kit', 'emergency kit', 'supplies','first-aid'], response: "A basic emergency kit should include: water (1 gal/person/day), non-perishable food, flashlight, batteries, first aid kit, medications, multi-tool, sanitation items, cash, important documents, and phone chargers." },
+        { keywords: ['plan', 'emergency plan', 'family plan'], response: "A family emergency plan should include: meeting places, emergency contacts, evacuation routes, pet plans, and special needs considerations. Use our <a href='#'>Family Plan Tool</a> to create one." },
+        { keywords: ['sos', 'emergency', 'help'], response: "For emergencies, click the SOS button in the navigation or on the map page. This will alert authorities with your location." }
+    ];
+
+    const defaultResponse = "I can help with information about earthquakes, floods, hurricanes, wildfires, emergency kits, and family plans. What would you like to know?";
+
+    // Event handlers
+    const toggleChat = () => elements.aiChatbox.classList.toggle('active');
+    const closeChat = () => elements.aiChatbox.classList.remove('active');
+
+    const sendUserMessage = () => {
+        const message = elements.userInput.value.trim();
+        if (!message) return;
+
+        addMessage(message, 'user');
+        elements.userInput.value = '';
+        
+        // Debounced response
+        setTimeout(() => {
+            const response = generateBotResponse(message.toLowerCase());
+            addMessage(response, 'bot');
+        }, 800);
+    };
+
+    const handleKeyPress = (e) => {
+        if (e.key === 'Enter') sendUserMessage();
+    };
+
+    // Message management
+    const addMessage = (text, sender) => {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message ${sender}`;
+        messageDiv.innerHTML = `<p>${text}</p>`;
+        elements.chatMessages.appendChild(messageDiv);
+        elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
+    };
+
+    // Efficient response generation
+    const generateBotResponse = (message) => {
+        // Find the first matching response based on keyword priority
+        const matchedResponse = botResponses.find(response => 
+            response.keywords.some(keyword => message.includes(keyword))
+        );
+        
+        return matchedResponse ? matchedResponse.response : defaultResponse;
+    };
+
+    // Event listeners
+    elements.aiButton.addEventListener('click', toggleChat);
+    elements.closeChat.addEventListener('click', closeChat);
+    elements.sendMessage.addEventListener('click', sendUserMessage);
+    elements.userInput.addEventListener('keypress', handleKeyPress);
+};
+
+// Initialize all functionality
+initMap();
+testimonialCarousel();
+initChatbot();
+initSOS();
     
     // Animate progress meters when scrolled into view
     window.addEventListener('scroll', function() {
@@ -1606,8 +1565,7 @@ img {
     }, { threshold: 0.5 });
 
     observer.observe(document.querySelector('.dashboard'));
-});</script>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+});
+</script>
 </body>
 </html>

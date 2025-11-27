@@ -27,7 +27,7 @@ markdown
 Copy
 Edit
 1. Clone the repository:
-   git clone https://github.com/yourusername/disaster-management.git
+   git clone https://github.com/NAYAMATVISION/disaster-management.git
 
 2. Install dependencies:
    pip install -r requirements.txt

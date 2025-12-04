@@ -1308,8 +1308,11 @@
                     console.log('Using your current location for distance calculation');
                 }
                 
-                // Fetch resources near the location
-                await fetchAndDisplayResources(resourceType, searchCoords, locationInput);
+                // Fetch resources for ALL types to populate all tabs
+                await fetchAllResourceTypes(searchCoords, locationInput);
+                
+                // Switch to the requested resource type tab
+                switchToResourceTab(resourceType);
                 
                 loading.style.display = 'none';
                 
@@ -1341,19 +1344,31 @@
             }
         }
         
+        // Fetch all resource types at once
+        async function fetchAllResourceTypes(coords, locationName) {
+            const resourceTypes = ['medical', 'rescue', 'food', 'shelter'];
+            
+            // Fetch all types in parallel
+            const promises = resourceTypes.map(type => 
+                fetchAndDisplayResources(type, coords, locationName)
+            );
+            
+            await Promise.all(promises);
+        }
+        
         // Fetch and display resources using Overpass API
         async function fetchAndDisplayResources(resourceType, coords, locationName) {
             // Map resource types to OpenStreetMap tags - search multiple types
             const resourceTags = {
-                'medical': ['amenity=hospital', 'amenity=clinic', 'healthcare=hospital', 'healthcare=clinic'],
-                'rescue': ['amenity=fire_station', 'amenity=police'],
-                'food': ['amenity=food_bank', 'amenity=restaurant', 'shop=supermarket'],
-                'shelter': ['amenity=shelter', 'building=shelter'],
-                'transport': ['amenity=bus_station', 'public_transport=station']
+                'medical': ['amenity=hospital', 'amenity=clinic', 'healthcare=hospital', 'healthcare=clinic', 'amenity=doctors'],
+                'rescue': ['amenity=fire_station', 'amenity=police', 'emergency=fire_station', 'office=government'],
+                'food': ['amenity=restaurant', 'amenity=fast_food', 'amenity=cafe', 'shop=supermarket', 'shop=convenience', 'amenity=food_court'],
+                'shelter': ['tourism=hotel', 'tourism=guest_house', 'amenity=community_centre', 'amenity=social_facility', 'building=civic'],
+                'transport': ['amenity=bus_station', 'public_transport=station', 'highway=bus_stop', 'railway=station']
             };
             
             const tags = resourceTags[resourceType] || ['amenity=hospital'];
-            const radius = 20000; // 20km radius for better coverage
+            const radius = 25000; // 25km radius for better coverage
             
             // Overpass API query - search for multiple tag types
             const tagQueries = tags.map(tag => `
@@ -1420,9 +1435,6 @@
             
             // Update the resource tabs
             updateResourceTab(resourceType, processedResources, locationName, fromCoords);
-            
-            // Switch to the relevant tab
-            switchToResourceTab(resourceType);
         }
         
         // Calculate distance between two coordinates (Haversine formula)
@@ -1464,25 +1476,50 @@
             const contentDiv = document.getElementById(`${tabType}-content`);
             contentDiv.innerHTML = '';
             
+            // Resource type display names
+            const typeNames = {
+                'medical': 'Medical Facilities',
+                'rescue': 'Rescue Services',
+                'food': 'Food & Water Resources',
+                'shelter': 'Shelter Facilities'
+            };
+            
             // Add header
             const header = document.createElement('div');
             header.style.cssText = 'background: #e8f5e8; padding: 10px; margin-bottom: 15px; border-radius: 5px;';
             const fromLocation = userLocation ? 'your current location' : locationName;
-            header.innerHTML = `<strong>📍 Found ${resources.length} resources near ${locationName}</strong><br><small>Distances calculated from ${fromLocation}</small>`;
+            header.innerHTML = `<strong>📍 Found ${resources.length} ${typeNames[tabType] || 'resources'} near ${locationName}</strong><br><small>Distances calculated from ${fromLocation}</small>`;
             contentDiv.appendChild(header);
             
             if (resources.length === 0) {
-                contentDiv.innerHTML += '<p style="text-align: center; color: #666; padding: 20px;">No resources found nearby. Try a different location or resource type.</p>';
+                const noResultsMsg = document.createElement('div');
+                noResultsMsg.style.cssText = 'text-align: center; padding: 30px; color: #666;';
+                noResultsMsg.innerHTML = `
+                    <i class="fas fa-search" style="font-size: 2em; color: #ccc; margin-bottom: 10px;"></i>
+                    <p>No ${typeNames[tabType] || 'resources'} found in this area.</p>
+                    <p style="font-size: 0.9em;">Try searching in a nearby city or expanding your search area.</p>
+                `;
+                contentDiv.appendChild(noResultsMsg);
                 return;
             }
+            
+            // Icons for different resource types
+            const typeIcons = {
+                'medical': '🏥',
+                'rescue': '🚒',
+                'food': '🍽️',
+                'shelter': '🏠'
+            };
             
             resources.forEach((resource, index) => {
                 const resourceItem = document.createElement('div');
                 resourceItem.className = 'resource-item';
                 const safeName = resource.name.replace(/'/g, "\\'");
+                const icon = typeIcons[tabType] || '📍';
+                
                 resourceItem.innerHTML = `
                     <div class="resource-info">
-                        <h4>${resource.name}</h4>
+                        <h4>${icon} ${resource.name}</h4>
                         <p>📍 ${resource.address}</p>
                         <p><strong>${resource.distance} km away</strong> | 📞 ${resource.phone}</p>
                     </div>

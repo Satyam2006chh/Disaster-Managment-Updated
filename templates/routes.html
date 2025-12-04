@@ -387,6 +387,49 @@
         .route-steps li {
             margin-bottom: 5px;
         }
+        
+        /* Location-specific styles */
+        #refresh-location-btn {
+            background: var(--success) !important;
+            transition: all 0.3s ease;
+        }
+        
+        #refresh-location-btn:hover {
+            background: #219a52 !important;
+            transform: scale(1.05);
+        }
+        
+        .location-status {
+            font-size: 0.9rem;
+            color: var(--success);
+            margin-top: 5px;
+            display: none;
+        }
+        
+        .location-status.active {
+            display: block;
+        }
+        
+        .location-error {
+            color: var(--secondary);
+        }
+        
+        /* Pulsing animation for user location */
+        .user-location-pulse {
+            animation: locationPulse 2s infinite;
+        }
+        
+        @keyframes locationPulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(0, 123, 255, 0.7);
+            }
+            70% {
+                box-shadow: 0 0 0 20px rgba(0, 123, 255, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(0, 123, 255, 0);
+            }
+        }
     </style>
 </head>
 <body>
@@ -408,7 +451,15 @@
                 <h2>Find Safe Routes</h2>
                 <div class="form-group">
                     <label for="current-location">Your Location</label>
-                    <input type="text" id="current-location" placeholder="Enter address or use current location" value="Connaught Place, New Delhi">
+                    <div style="display: flex; gap: 10px;">
+                        <input type="text" id="current-location" placeholder="Getting your location..." style="flex: 1;">
+                        <button type="button" class="btn" id="refresh-location-btn" style="padding: 12px; min-width: auto;" title="Refresh your location">
+                            <i class="fas fa-location-arrow"></i>
+                        </button>
+                    </div>
+                    <div class="location-status" id="location-status">
+                        <i class="fas fa-check-circle"></i> Location updated successfully
+                    </div>
                 </div>
                 <div class="form-group">
                     <label for="destination">Destination</label>
@@ -619,13 +670,225 @@
     <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
     <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
     <script>
-        // Initialize the map centered on Delhi
+        // Initialize the map centered on Delhi (will be updated with user location)
         const map = L.map('map').setView([28.6139, 77.2090], 13);
+        
+        // User location variables
+        let userLocation = null;
+        let userMarker = null;
+        let watchId = null;
         
         // Add OpenStreetMap tiles
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(map);
+        
+        // Custom "You are here" icon
+        const userLocationIcon = L.icon({
+            iconUrl: 'data:image/svg+xml;base64,' + btoa(`
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="32" height="32">
+                    <circle cx="12" cy="12" r="10" fill="#007bff" stroke="white" stroke-width="2"/>
+                    <circle cx="12" cy="12" r="6" fill="white"/>
+                    <circle cx="12" cy="12" r="3" fill="#007bff"/>
+                </svg>
+            `),
+            iconSize: [32, 32],
+            iconAnchor: [16, 16],
+            popupAnchor: [0, -16]
+        });
+        
+        // Function to get user's current location
+        function getUserLocation() {
+            if (!navigator.geolocation) {
+                showLocationStatus('Geolocation is not supported by this browser.', 'error');
+                document.getElementById('current-location').value = 'Connaught Place, New Delhi (Default)';
+                return;
+            }
+            
+            const options = {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 60000 // Cache location for 1 minute
+            };
+            
+            // Show loading indicator
+            const loading = document.getElementById('loading-indicator');
+            loading.style.display = 'block';
+            
+            // Update status
+            showLocationStatus('Getting your location...', 'loading');
+            
+            navigator.geolocation.getCurrentPosition(
+                function(position) {
+                    loading.style.display = 'none';
+                    updateUserLocation(position.coords.latitude, position.coords.longitude);
+                    
+                    // Start watching position for real-time updates
+                    startLocationTracking();
+                },
+                function(error) {
+                    loading.style.display = 'none';
+                    handleLocationError(error);
+                },
+                options
+            );
+        }
+        
+        // Function to request location permission with user-friendly prompt
+        function requestLocationPermission() {
+            if ('permissions' in navigator) {
+                navigator.permissions.query({name: 'geolocation'}).then(function(result) {
+                    if (result.state === 'granted') {
+                        getUserLocation();
+                    } else if (result.state === 'prompt') {
+                        // Show a friendly message before requesting permission
+                        if (confirm('This app would like to access your location to show you nearby emergency resources and provide accurate directions. Allow location access?')) {
+                            getUserLocation();
+                        } else {
+                            showLocationStatus('Location access denied. Using default location.', 'error');
+                            document.getElementById('current-location').value = 'Connaught Place, New Delhi (Default)';
+                        }
+                    } else {
+                        showLocationStatus('Location access denied. Using default location.', 'error');
+                        document.getElementById('current-location').value = 'Connaught Place, New Delhi (Default)';
+                    }
+                });
+            } else {
+                // Fallback for browsers that don't support permissions API
+                getUserLocation();
+            }
+        }
+        
+        // Function to update user location on map
+        function updateUserLocation(lat, lng) {
+            userLocation = [lat, lng];
+            
+            // Remove existing user marker if it exists
+            if (userMarker) {
+                map.removeLayer(userMarker);
+            }
+            
+            // Add new user marker with pulsing effect
+            userMarker = L.marker([lat, lng], { icon: userLocationIcon })
+                .addTo(map)
+                .bindPopup('<b>🎯 You are here!</b><br>📍 Current location<br><small>Updated: ' + new Date().toLocaleTimeString() + '</small>')
+                .openPopup();
+            
+            // Center map on user location
+            map.setView([lat, lng], 15);
+            
+            // Update the current location input field
+            updateLocationInput(lat, lng);
+            
+            // Show success status
+            showLocationStatus('Location updated successfully', 'success');
+        }
+        
+        // Function to start real-time location tracking
+        function startLocationTracking() {
+            if (!navigator.geolocation) return;
+            
+            const options = {
+                enableHighAccuracy: true,
+                timeout: 5000,
+                maximumAge: 30000 // Update every 30 seconds
+            };
+            
+            watchId = navigator.geolocation.watchPosition(
+                function(position) {
+                    updateUserLocation(position.coords.latitude, position.coords.longitude);
+                },
+                function(error) {
+                    console.warn('Location tracking error:', error);
+                },
+                options
+            );
+        }
+        
+        // Function to stop location tracking
+        function stopLocationTracking() {
+            if (watchId !== null) {
+                navigator.geolocation.clearWatch(watchId);
+                watchId = null;
+            }
+        }
+        
+        // Function to handle location errors
+        function handleLocationError(error) {
+            let message = 'Unable to get your location. ';
+            
+            switch(error.code) {
+                case error.PERMISSION_DENIED:
+                    message += 'Location access denied. Please enable location access in your browser.';
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    message += 'Location information unavailable.';
+                    break;
+                case error.TIMEOUT:
+                    message += 'Location request timed out.';
+                    break;
+                default:
+                    message += 'An unknown error occurred.';
+                    break;
+            }
+            
+            // Show error status
+            showLocationStatus(message, 'error');
+            
+            // Set default location
+            document.getElementById('current-location').value = 'Connaught Place, New Delhi (Default)';
+        }
+        
+        // Function to show location status
+        function showLocationStatus(message, type) {
+            const statusElement = document.getElementById('location-status');
+            statusElement.textContent = message;
+            statusElement.className = 'location-status active';
+            
+            if (type === 'error') {
+                statusElement.classList.add('location-error');
+                statusElement.innerHTML = '<i class="fas fa-exclamation-triangle"></i> ' + message;
+            } else if (type === 'loading') {
+                statusElement.classList.remove('location-error');
+                statusElement.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + message;
+                return; // Don't auto-hide loading messages
+            } else {
+                statusElement.classList.remove('location-error');
+                statusElement.innerHTML = '<i class="fas fa-check-circle"></i> ' + message;
+            }
+            
+            // Hide status after 5 seconds (except for loading)
+            if (type !== 'loading') {
+                setTimeout(() => {
+                    statusElement.classList.remove('active');
+                }, 5000);
+            }
+        }
+        
+        // Function to update location input with reverse geocoding
+        function updateLocationInput(lat, lng) {
+            // Show coordinates immediately
+            document.getElementById('current-location').value = `📍 ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+            
+            // Simple reverse geocoding using Nominatim (OpenStreetMap)
+            fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data && data.display_name) {
+                        // Clean up the address for better readability
+                        let address = data.display_name;
+                        if (address.length > 80) {
+                            const parts = address.split(',');
+                            address = parts.slice(0, 3).join(',') + '...';
+                        }
+                        document.getElementById('current-location').value = '📍 ' + address;
+                    }
+                })
+                .catch(error => {
+                    console.warn('Reverse geocoding failed:', error);
+                    // Keep the coordinates if reverse geocoding fails
+                });
+        }
         
         // Sample markers for Northern India (Delhi area)
         const shelters = [
@@ -829,9 +1092,9 @@
                 }
             }
             
-            // For demo purposes, we'll use Connaught Place as starting point
-            const startCoords = [28.6315, 77.2167];
-            const startName = "Connaught Place";
+            // Use user's current location as starting point if available
+            const startCoords = userLocation || [28.6315, 77.2167];
+            const startName = userLocation ? "Your Current Location" : "Connaught Place";
             
             // Simulate API call with timeout
             setTimeout(() => {
@@ -881,6 +1144,11 @@
             }
         });
         
+        // Refresh location button
+        document.getElementById('refresh-location-btn').addEventListener('click', function() {
+            requestLocationPermission();
+        });
+        
         // Resource tabs
         document.querySelectorAll('.resource-tab').forEach(tab => {
             tab.addEventListener('click', function() {
@@ -909,10 +1177,20 @@
             }, 1500);
         });
         
-        // Show shelters by default when page loads
+        // Show shelters by default when page loads and get user location
         window.addEventListener('load', function() {
             shelterLayer.addTo(map);
             document.getElementById('show-shelters').classList.add('active');
+            
+            // Automatically request location permission and get user location when page loads
+            setTimeout(() => {
+                requestLocationPermission();
+            }, 1000); // Small delay to let the page fully load
+        });
+        
+        // Clean up location tracking when page is unloaded
+        window.addEventListener('beforeunload', function() {
+            stopLocationTracking();
         });
     </script>
 </body>

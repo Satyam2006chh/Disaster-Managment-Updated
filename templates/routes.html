@@ -550,13 +550,6 @@
         
         <div id="map-container">
             <div id="map"></div>
-            <div class="map-overlay">
-                <button id="show-shelters">Shelters</button>
-                <button id="show-hospitals">Hospitals</button>
-                <button id="show-fire">Fire Stations</button>
-                <button id="show-police">Police</button>
-                <button id="show-all">Show All</button>
-            </div>
         </div>
         
         <div class="loading" id="loading-indicator">
@@ -1011,53 +1004,7 @@
         // Routing control
         let routingControl = null;
         
-        // Map overlay controls
-        document.getElementById('show-shelters').addEventListener('click', function() {
-            this.classList.toggle('active');
-            if (this.classList.contains('active')) {
-                shelterLayer.addTo(map);
-            } else {
-                map.removeLayer(shelterLayer);
-            }
-        });
-        
-        document.getElementById('show-hospitals').addEventListener('click', function() {
-            this.classList.toggle('active');
-            if (this.classList.contains('active')) {
-                hospitalLayer.addTo(map);
-            } else {
-                map.removeLayer(hospitalLayer);
-            }
-        });
-        
-        document.getElementById('show-fire').addEventListener('click', function() {
-            this.classList.toggle('active');
-            if (this.classList.contains('active')) {
-                fireLayer.addTo(map);
-            } else {
-                map.removeLayer(fireLayer);
-            }
-        });
-        
-        document.getElementById('show-police').addEventListener('click', function() {
-            this.classList.toggle('active');
-            if (this.classList.contains('active')) {
-                policeLayer.addTo(map);
-            } else {
-                map.removeLayer(policeLayer);
-            }
-        });
-        
-        document.getElementById('show-all').addEventListener('click', function() {
-            shelterLayer.addTo(map);
-            hospitalLayer.addTo(map);
-            fireLayer.addTo(map);
-            policeLayer.addTo(map);
-            
-            document.querySelectorAll('.map-overlay button').forEach(btn => {
-                btn.classList.add('active');
-            });
-        });
+        // Removed map overlay controls for clearer route display
         
         // Destination type change
         document.getElementById('destination').addEventListener('change', function() {
@@ -1598,11 +1545,8 @@
             switchToResourceTab(resourceType);
         }
         
-        // Show shelters by default when page loads and get user location
+        // Get user location when page loads
         window.addEventListener('load', function() {
-            shelterLayer.addTo(map);
-            document.getElementById('show-shelters').classList.add('active');
-            
             // Automatically request location permission and get user location when page loads
             setTimeout(() => {
                 requestLocationPermission();

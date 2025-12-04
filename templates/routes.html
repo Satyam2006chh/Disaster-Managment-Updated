@@ -98,6 +98,7 @@
         
         .form-group {
             margin-bottom: 15px;
+            position: relative;
         }
         
         label {
@@ -430,6 +431,39 @@
                 box-shadow: 0 0 0 0 rgba(0, 123, 255, 0);
             }
         }
+        
+        /* Location autocomplete suggestions */
+        .location-suggestions {
+            position: absolute;
+            background: white;
+            border: 1px solid #ddd;
+            border-top: none;
+            max-height: 200px;
+            overflow-y: auto;
+            width: calc(100% - 2px);
+            z-index: 1000;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            display: none;
+        }
+        
+        .location-suggestions.active {
+            display: block;
+        }
+        
+        .suggestion-item {
+            padding: 10px;
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+            transition: background 0.2s;
+        }
+        
+        .suggestion-item:hover {
+            background: #f0f8ff;
+        }
+        
+        .suggestion-item:last-child {
+            border-bottom: none;
+        }
     </style>
 </head>
 <body>
@@ -494,7 +528,8 @@
                 </div>
                 <div class="form-group">
                     <label for="resource-location">Near</label>
-                    <input type="text" id="resource-location" placeholder="Enter location" value="Delhi">
+                    <input type="text" id="resource-location" placeholder="Enter location (e.g., Ambala, Punjab)" autocomplete="off">
+                    <div id="location-suggestions" class="location-suggestions"></div>
                 </div>
                 <button class="btn" id="find-resources-btn">Find Resources</button>
             </div>
@@ -1164,18 +1199,367 @@
             });
         });
         
-        // Find resources button
-        document.getElementById('find-resources-btn').addEventListener('click', function() {
+        // Location autocomplete variables
+        let selectedLocationCoords = null;
+        let autocompleteTimeout = null;
+        
+        // Location input autocomplete
+        document.getElementById('resource-location').addEventListener('input', function(e) {
+            const query = e.target.value.trim();
+            
+            if (query.length < 3) {
+                document.getElementById('location-suggestions').classList.remove('active');
+                return;
+            }
+            
+            // Debounce API calls
+            clearTimeout(autocompleteTimeout);
+            autocompleteTimeout = setTimeout(() => {
+                fetchLocationSuggestions(query);
+            }, 300);
+        });
+        
+        // Fetch location suggestions from Nominatim API
+        function fetchLocationSuggestions(query) {
+            const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ', India')}&limit=10&addressdetails=1`;
+            
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    displayLocationSuggestions(data);
+                })
+                .catch(error => {
+                    console.error('Location search error:', error);
+                });
+        }
+        
+        // Display location suggestions
+        function displayLocationSuggestions(locations) {
+            const suggestionsDiv = document.getElementById('location-suggestions');
+            suggestionsDiv.innerHTML = '';
+            
+            if (locations.length === 0) {
+                suggestionsDiv.classList.remove('active');
+                return;
+            }
+            
+            locations.forEach(location => {
+                const item = document.createElement('div');
+                item.className = 'suggestion-item';
+                item.textContent = location.display_name;
+                item.onclick = function() {
+                    document.getElementById('resource-location').value = location.display_name;
+                    selectedLocationCoords = { lat: parseFloat(location.lat), lng: parseFloat(location.lon) };
+                    suggestionsDiv.classList.remove('active');
+                };
+                suggestionsDiv.appendChild(item);
+            });
+            
+            suggestionsDiv.classList.add('active');
+        }
+        
+        // Close suggestions when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.form-group')) {
+                document.getElementById('location-suggestions').classList.remove('active');
+            }
+        });
+        
+        // Find resources button - Real-time API integration
+        document.getElementById('find-resources-btn').addEventListener('click', async function() {
+            const resourceType = document.getElementById('resource-type').value;
+            const locationInput = document.getElementById('resource-location').value.trim();
+            
+            if (!locationInput) {
+                alert('Please enter a location in the "Near" field.');
+                return;
+            }
+            
+            // Check if user location is available
+            if (!userLocation) {
+                const useCurrentLocation = confirm('Your current location is not detected. Would you like to enable location access for accurate distance calculations?');
+                if (useCurrentLocation) {
+                    await new Promise(resolve => {
+                        getUserLocation();
+                        setTimeout(resolve, 2000);
+                    });
+                }
+            }
+            
             const loading = document.getElementById('loading-indicator');
             loading.style.display = 'block';
             
-            // Simulate API call
-            setTimeout(() => {
+            try {
+                // Get coordinates for the entered location if not already selected
+                let searchCoords = selectedLocationCoords;
+                
+                if (!searchCoords) {
+                    searchCoords = await geocodeLocation(locationInput);
+                }
+                
+                if (!searchCoords) {
+                    loading.style.display = 'none';
+                    alert('Could not find the location. Please select from suggestions.');
+                    return;
+                }
+                
+                // Show message about using current location
+                if (userLocation) {
+                    console.log('Using your current location for distance calculation');
+                }
+                
+                // Fetch resources near the location
+                await fetchAndDisplayResources(resourceType, searchCoords, locationInput);
+                
                 loading.style.display = 'none';
-                // In a real app, this would update the resource lists
-                alert('Resources have been updated based on your location. In a real app, this would fetch real data.');
-            }, 1500);
+                
+                // Scroll to results
+                document.getElementById('resource-results').scrollIntoView({ behavior: 'smooth' });
+                
+            } catch (error) {
+                loading.style.display = 'none';
+                console.error('Error finding resources:', error);
+                alert('Error finding resources. Please try again.');
+            }
         });
+        
+        // Geocode location to get coordinates
+        async function geocodeLocation(locationName) {
+            const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(locationName + ', India')}&limit=1&addressdetails=1`;
+            
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                if (data.length > 0) {
+                    return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+                }
+                return null;
+            } catch (error) {
+                console.error('Geocoding error:', error);
+                return null;
+            }
+        }
+        
+        // Fetch and display resources using Overpass API
+        async function fetchAndDisplayResources(resourceType, coords, locationName) {
+            // Map resource types to OpenStreetMap tags - search multiple types
+            const resourceTags = {
+                'medical': ['amenity=hospital', 'amenity=clinic', 'healthcare=hospital', 'healthcare=clinic'],
+                'rescue': ['amenity=fire_station', 'amenity=police'],
+                'food': ['amenity=food_bank', 'amenity=restaurant', 'shop=supermarket'],
+                'shelter': ['amenity=shelter', 'building=shelter'],
+                'transport': ['amenity=bus_station', 'public_transport=station']
+            };
+            
+            const tags = resourceTags[resourceType] || ['amenity=hospital'];
+            const radius = 20000; // 20km radius for better coverage
+            
+            // Overpass API query - search for multiple tag types
+            const tagQueries = tags.map(tag => `
+                node[${tag}](around:${radius},${coords.lat},${coords.lng});
+                way[${tag}](around:${radius},${coords.lat},${coords.lng});
+            `).join('');
+            
+            const query = `
+                [out:json][timeout:25];
+                (
+                  ${tagQueries}
+                );
+                out body;
+                >;
+                out skel qt;
+            `;
+            
+            const url = 'https://overpass-api.de/api/interpreter';
+            
+            console.log('Searching for resources:', resourceType, 'near', coords);
+            
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    body: query
+                });
+                
+                const data = await response.json();
+                
+                // Process and display results
+                displayResourceResults(data.elements, resourceType, coords, locationName);
+                
+            } catch (error) {
+                console.error('Overpass API error:', error);
+                // Fallback to showing message
+                displayFallbackMessage(resourceType, locationName);
+            }
+        }
+        
+        // Display resource results
+        function displayResourceResults(resources, resourceType, searchCoords, locationName) {
+            // Use user's current location for distance calculation, fallback to search coords
+            const fromCoords = userLocation ? { lat: userLocation[0], lng: userLocation[1] } : searchCoords;
+            
+            // Calculate distances and sort
+            const processedResources = resources
+                .filter(r => r.tags && r.tags.name)
+                .map(resource => {
+                    const lat = resource.lat || resource.center?.lat;
+                    const lng = resource.lon || resource.center?.lon;
+                    const distance = calculateDistance(fromCoords.lat, fromCoords.lng, lat, lng);
+                    
+                    return {
+                        name: resource.tags.name,
+                        address: formatAddress(resource.tags),
+                        distance: distance,
+                        phone: resource.tags.phone || resource.tags['contact:phone'] || 'N/A',
+                        lat: lat,
+                        lng: lng
+                    };
+                })
+                .sort((a, b) => a.distance - b.distance)
+                .slice(0, 10); // Top 10 nearest
+            
+            // Update the resource tabs
+            updateResourceTab(resourceType, processedResources, locationName, fromCoords);
+            
+            // Switch to the relevant tab
+            switchToResourceTab(resourceType);
+        }
+        
+        // Calculate distance between two coordinates (Haversine formula)
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; // Earth's radius in km
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                      Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return (R * c).toFixed(1);
+        }
+        
+        // Format address from OSM tags
+        function formatAddress(tags) {
+            const parts = [];
+            if (tags['addr:housenumber']) parts.push(tags['addr:housenumber']);
+            if (tags['addr:street']) parts.push(tags['addr:street']);
+            if (tags['addr:suburb']) parts.push(tags['addr:suburb']);
+            if (tags['addr:city']) parts.push(tags['addr:city']);
+            if (tags['addr:district']) parts.push(tags['addr:district']);
+            if (tags['addr:state']) parts.push(tags['addr:state']);
+            if (tags['addr:postcode']) parts.push(tags['addr:postcode']);
+            
+            if (parts.length > 0) {
+                return parts.join(', ');
+            }
+            
+            // Fallback to other location info
+            if (tags.city) return tags.city;
+            if (tags.state) return tags.state;
+            
+            return 'Address details not available';
+        }
+        
+        // Update resource tab with real data
+        function updateResourceTab(tabType, resources, locationName, fromCoords) {
+            const contentDiv = document.getElementById(`${tabType}-content`);
+            contentDiv.innerHTML = '';
+            
+            // Add header
+            const header = document.createElement('div');
+            header.style.cssText = 'background: #e8f5e8; padding: 10px; margin-bottom: 15px; border-radius: 5px;';
+            const fromLocation = userLocation ? 'your current location' : locationName;
+            header.innerHTML = `<strong>📍 Found ${resources.length} resources near ${locationName}</strong><br><small>Distances calculated from ${fromLocation}</small>`;
+            contentDiv.appendChild(header);
+            
+            if (resources.length === 0) {
+                contentDiv.innerHTML += '<p style="text-align: center; color: #666; padding: 20px;">No resources found nearby. Try a different location or resource type.</p>';
+                return;
+            }
+            
+            resources.forEach((resource, index) => {
+                const resourceItem = document.createElement('div');
+                resourceItem.className = 'resource-item';
+                const safeName = resource.name.replace(/'/g, "\\'");
+                resourceItem.innerHTML = `
+                    <div class="resource-info">
+                        <h4>${resource.name}</h4>
+                        <p>📍 ${resource.address}</p>
+                        <p><strong>${resource.distance} km away</strong> | 📞 ${resource.phone}</p>
+                    </div>
+                    <div class="resource-action">
+                        <button class="btn" onclick="showRouteOnMap(${fromCoords.lat}, ${fromCoords.lng}, ${resource.lat}, ${resource.lng}, '${safeName}')">Get Directions</button>
+                    </div>
+                `;
+                contentDiv.appendChild(resourceItem);
+            });
+        }
+        
+        // Switch to specific resource tab
+        function switchToResourceTab(tabType) {
+            document.querySelectorAll('.resource-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.resource-content').forEach(c => c.classList.remove('active'));
+            
+            const targetTab = document.querySelector(`[data-tab="${tabType}"]`);
+            const targetContent = document.getElementById(`${tabType}-content`);
+            
+            if (targetTab && targetContent) {
+                targetTab.classList.add('active');
+                targetContent.classList.add('active');
+            }
+        }
+        
+        // Show route on map from current location to destination
+        function showRouteOnMap(fromLat, fromLng, toLat, toLng, name) {
+            // Clear previous route if exists
+            if (routingControl) {
+                map.removeControl(routingControl);
+                routingControl = null;
+            }
+            
+            // Create route
+            routingControl = L.Routing.control({
+                waypoints: [
+                    L.latLng(fromLat, fromLng),
+                    L.latLng(toLat, toLng)
+                ],
+                routeWhileDragging: false,
+                addWaypoints: false,
+                draggableWaypoints: false,
+                fitSelectedRoutes: true,
+                showAlternatives: false
+            }).addTo(map);
+            
+            // Add markers
+            L.marker([fromLat, fromLng], { icon: userLocationIcon })
+                .addTo(map)
+                .bindPopup('<b>Your Location</b>');
+            
+            L.marker([toLat, toLng])
+                .addTo(map)
+                .bindPopup(`<b>${name}</b>`);
+            
+            // Fit map to show both points
+            map.fitBounds([
+                [fromLat, fromLng],
+                [toLat, toLng]
+            ], { padding: [50, 50] });
+            
+            // Scroll to map
+            document.getElementById('map-container').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        
+        // Fallback message when API fails
+        function displayFallbackMessage(resourceType, locationName) {
+            const contentDiv = document.getElementById(`${resourceType}-content`);
+            contentDiv.innerHTML = `
+                <div style="text-align: center; padding: 30px;">
+                    <p style="color: #666;">⚠️ Unable to fetch real-time data at the moment.</p>
+                    <p style="color: #666;">Please try again or contact emergency services directly:</p>
+                    <p style="font-size: 1.2em; margin-top: 15px;"><strong>📞 Emergency: 112</strong></p>
+                </div>
+            `;
+            switchToResourceTab(resourceType);
+        }
         
         // Show shelters by default when page loads and get user location
         window.addEventListener('load', function() {

@@ -526,49 +526,85 @@
         // Set current date and time
         document.getElementById('update-time').textContent = new Date().toLocaleString();
         
-        // Sample alert data
+        // Get alerts from database (passed from Flask)
         const alerts = [
-            {
-                type: "Flood Warning",
-                severity: "high",
-                areas: ["Coastal Districts", "River Basin Areas"],
-                timeframe: "June 15 - June 18, 2023",
-                advisory: "Heavy rainfall expected. Avoid low-lying areas. Follow evacuation orders if issued.",
-                icon: "fa-water"
-            },
-            {
-                type: "Cyclone Alert",
-                severity: "medium",
-                areas: ["Eastern Coastal Region"],
-                timeframe: "June 20 - June 22, 2023",
-                advisory: "Cyclone forming in Bay of Bengal. Secure loose objects, prepare emergency kits.",
-                icon: "fa-wind"
-            },
-            {
-                type: "Heat Wave",
-                severity: "medium",
-                areas: ["Northern Plains", "Central Region"],
-                timeframe: "June 12 - June 15, 2023",
-                advisory: "Temperatures expected to exceed 45°C. Stay hydrated, avoid outdoor activities during peak hours.",
-                icon: "fa-sun"
-            },
-            {
-                type: "Earthquake Aftershocks",
-                severity: "low",
-                areas: ["Northern Mountain Region"],
-                timeframe: "Ongoing",
-                advisory: "Minor aftershocks possible after yesterday's 5.8 quake. Check structures for damage.",
-                icon: "fa-mountain"
-            }
+            {% if alerts %}
+                {% for alert in alerts %}
+                {
+                    type: "{{ alert.title }}",
+                    severity: "{{ alert.severity.lower() if alert.severity else 'medium' }}",
+                    areas: ["{{ alert.affected_areas }}"],
+                    timeframe: "{{ alert.timeframe or 'Ongoing' }}",
+                    advisory: "{{ alert.advisory }}",
+                    icon: getIconForDisaster("{{ alert.title }}"),
+                    reported_by: "{{ alert.reported_by }}",
+                    created_at: "{{ alert.created_at }}"
+                }{% if not loop.last %},{% endif %}
+                {% endfor %}
+            {% else %}
+                {
+                    type: "No Active Alerts",
+                    severity: "low",
+                    areas: ["All Areas"],
+                    timeframe: "Current Status",
+                    advisory: "No disaster alerts are currently active in your area. Stay prepared and check back regularly for updates.",
+                    icon: "fa-info-circle",
+                    reported_by: "System",
+                    created_at: new Date().toISOString()
+                }
+            {% endif %}
         ];
+        
+        // Function to get appropriate icon based on disaster type
+        function getIconForDisaster(title) {
+            const titleLower = title.toLowerCase();
+            if (titleLower.includes('flood') || titleLower.includes('water')) return 'fa-water';
+            if (titleLower.includes('cyclone') || titleLower.includes('hurricane') || titleLower.includes('wind')) return 'fa-wind';
+            if (titleLower.includes('earthquake') || titleLower.includes('seismic')) return 'fa-mountain';
+            if (titleLower.includes('fire') || titleLower.includes('wildfire')) return 'fa-fire';
+            if (titleLower.includes('heat') || titleLower.includes('temperature')) return 'fa-sun';
+            if (titleLower.includes('storm') || titleLower.includes('thunder')) return 'fa-bolt';
+            if (titleLower.includes('drought')) return 'fa-tint-slash';
+            if (titleLower.includes('landslide') || titleLower.includes('avalanche')) return 'fa-mountain';
+            return 'fa-exclamation-triangle'; // default icon
+        }
         
         // Populate alerts
         const alertGrid = document.getElementById('alert-grid');
         
-        alerts.forEach((alert, index) => {
-            const alertCard = document.createElement('div');
-            alertCard.className = `alert-card ${alert.severity}`;
-            alertCard.style.animationDelay = `${index * 0.1}s`;
+        if (alerts.length === 0) {
+            alertGrid.innerHTML = `
+                <div class="alert-card low" style="grid-column: 1 / -1; text-align: center;">
+                    <div class="alert-header">
+                        <div class="alert-icon">
+                            <i class="fas fa-info-circle"></i>
+                        </div>
+                        <div>
+                            <div class="alert-title">No Active Alerts</div>
+                            <div class="alert-severity">INFO</div>
+                        </div>
+                    </div>
+                    <div class="alert-body">
+                        <div class="alert-detail">
+                            <i class="fas fa-check-circle"></i>
+                            <div>
+                                <strong>Status:</strong> No disaster alerts are currently active in your area.
+                            </div>
+                        </div>
+                        <div class="alert-detail">
+                            <i class="fas fa-shield-alt"></i>
+                            <div>
+                                <strong>Advisory:</strong> Stay prepared and check back regularly for updates. Report any disasters through the government portal.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        } else {
+            alerts.forEach((alert, index) => {
+                const alertCard = document.createElement('div');
+                alertCard.className = `alert-card ${alert.severity}`;
+                alertCard.style.animationDelay = `${index * 0.1}s`;
             
             alertCard.innerHTML = `
                 <div class="alert-header">
@@ -584,7 +620,7 @@
                     <div class="alert-detail">
                         <i class="fas fa-map-marker-alt"></i>
                         <div>
-                            <strong>Affected Areas:</strong> ${alert.areas.join(', ')}
+                            <strong>Affected Areas:</strong> ${Array.isArray(alert.areas) ? alert.areas.join(', ') : alert.areas}
                         </div>
                     </div>
                     <div class="alert-detail">
@@ -599,11 +635,28 @@
                             <strong>Advisory:</strong> ${alert.advisory}
                         </div>
                     </div>
+                    ${alert.reported_by ? `
+                    <div class="alert-detail">
+                        <i class="fas fa-user"></i>
+                        <div>
+                            <strong>Reported by:</strong> ${alert.reported_by}
+                        </div>
+                    </div>
+                    ` : ''}
+                    ${alert.created_at ? `
+                    <div class="alert-detail">
+                        <i class="fas fa-clock"></i>
+                        <div>
+                            <strong>Reported at:</strong> ${new Date(alert.created_at).toLocaleString()}
+                        </div>
+                    </div>
+                    ` : ''}
                 </div>
             `;
             
-            alertGrid.appendChild(alertCard);
-        });
+                alertGrid.appendChild(alertCard);
+            });
+        }
         
         // Scroll animations
         const observerOptions = {

@@ -317,7 +317,8 @@
                     <li><a href="{{ url_for('about') }}">About</a></li>
                     <li><a href="{{ url_for('contacts') }}">Contacts</a></li>
                     <li><a href="{{ url_for('missing') }}">Missing Persons</a></li>
-                    <li><a href="{{ url_for('emergency') }}">Emergency</a></li>
+                    <li><a href="{{ url_for('user') }}">Emergency Alerts</a></li>
+                    <li><a href="{{ url_for('emergency') }}">Emergency Kit</a></li>
                     {% if session.get('user_email') %}
                         <li><a href="{{ url_for('logout') }}">Logout</a></li>
                     {% else %}

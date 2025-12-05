@@ -6,7 +6,7 @@ import sqlite3
 from werkzeug.security import generate_password_hash, check_password_hash
 import json
 from datetime import datetime
-from transformers import pipeline
+# from transformers import pipeline  # Commented out to avoid DLL issues
 from datetime import datetime
 from typing import Dict, Any
 from flask_sqlalchemy import SQLAlchemy
@@ -34,13 +34,25 @@ db = SQLAlchemy(app)
 
 # Initialize Groq API
 groq_api_key = os.getenv('GROQ_API_KEY')
-if not groq_api_key:
-    print("Warning: GROQ_API_KEY not found in environment variables")
+print(f"Groq API Key Status: {'LOADED' if groq_api_key and groq_api_key != 'your_groq_api_key_here' else 'NOT LOADED'}")
+if not groq_api_key or groq_api_key == 'your_groq_api_key_here':
+    print("Warning: GROQ_API_KEY not configured properly")
 
 def call_groq_api(message):
-    """Direct API call to Groq"""
-    if not groq_api_key:
+    """Enhanced Groq API call with multiple model fallbacks"""
+    if not groq_api_key or groq_api_key == 'your_groq_api_key_here' or len(groq_api_key) < 10:
+        print("Groq API key not configured properly")
         return None
+    
+    print(f"Calling Groq API with message: {message[:50]}...")
+    
+    # Available models from your list (in order of preference)
+    models = [
+        "llama-3.1-8b-instant",
+        "llama-3.3-70b-versatile", 
+        "meta-llama/llama-4-maverick-17b-128e-instruct",
+        "qwen/qwen3-32b"
+    ]
     
     url = "https://api.groq.com/openai/v1/chat/completions"
     headers = {
@@ -48,32 +60,83 @@ def call_groq_api(message):
         "Content-Type": "application/json"
     }
     
-    data = {
-        "model": "llama-3.1-8b-instant",
-        "messages": [
-            {
-                "role": "system",
-                "content": "You are DisasterBot, an AI assistant specialized in disaster management and emergency preparedness. Help with emergency procedures, safety tips, evacuation plans, and disaster response. Keep responses concise and practical."
-            },
-            {
-                "role": "user",
-                "content": message
-            }
-        ],
-        "temperature": 0.7,
-        "max_tokens": 500
-    }
+    # Enhanced system prompt for comprehensive disaster management
+    system_prompt = """You are DisasterBot, an expert AI assistant specialized in disaster management and emergency preparedness. 
+
+Your expertise includes:
+- Scientific explanations of natural disasters (how they form, causes, mechanisms)
+- Emergency response procedures for all natural disasters (earthquakes, floods, hurricanes, wildfires, tornadoes, tsunamis, cyclones, etc.)
+- Disaster measurement scales (Richter scale, Saffir-Simpson scale, Enhanced Fujita scale, etc.)
+- First aid and medical emergency guidance
+- Evacuation planning and safety protocols
+- Emergency kit preparation and supplies
+- Communication during emergencies
+- Post-disaster recovery and safety
+- Missing person protocols
+- Volunteer coordination during disasters
+- Rumor verification and misinformation detection
+- Historical disaster events and case studies
+- Climate change and disaster patterns
+- Building codes and disaster-resistant construction
+
+Answer ALL types of disaster-related questions including:
+- "What is..." questions (definitions, explanations)
+- "How is... formed" questions (scientific processes)
+- "Why does... happen" questions (causes and mechanisms)
+- "When did... occur" questions (historical events)
+- "Where do... happen" questions (geographical patterns)
+- Safety and preparedness questions
+- Emergency response procedures
+
+Always provide:
+- Accurate, comprehensive information
+- Clear explanations appropriate for the question type
+- Scientific details when asked about formation/causes
+- Safety information when asked about preparedness
+- Step-by-step instructions when appropriate
+- Relevant examples and case studies
+- Calm, informative tone
+
+Respond to EVERY disaster management question with detailed, accurate information. Never redirect to safety measures unless specifically asked about safety."""
+
+    for model in models:
+        data = {
+            "model": model,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": system_prompt
+                },
+                {
+                    "role": "user",
+                    "content": message
+                }
+            ],
+            "temperature": 0.7,
+            "max_tokens": 1000,
+            "top_p": 0.9
+        }
+        
+        try:
+            print(f"Trying model: {model}")
+            response = requests.post(url, headers=headers, json=data, timeout=20)
+            
+            if response.status_code == 200:
+                result = response.json()
+                ai_response = result["choices"][0]["message"]["content"]
+                print(f"SUCCESS! Got response from {model}")
+                return ai_response
+            else:
+                print(f"Model {model} failed with status: {response.status_code}")
+                print(f"Response: {response.text}")
+                continue
+                
+        except Exception as e:
+            print(f"Error with model {model}: {e}")
+            continue
     
-    try:
-        response = requests.post(url, headers=headers, json=data, timeout=10)
-        if response.status_code == 200:
-            return response.json()["choices"][0]["message"]["content"]
-        else:
-            print(f"Groq API error: {response.status_code}")
-            return None
-    except Exception as e:
-        print(f"Error calling Groq API: {e}")
-        return None
+    print("All models failed, returning None")
+    return None
 
 
 # -------------------------------------------------
@@ -130,113 +193,95 @@ with app.app_context():
     db.create_all()
 
 # -------------------------------------------------
-# Pretrained fake-news classifier (Hugging Face)
+# Rumor classifier (Using heuristic approach)
 # -------------------------------------------------
-try:
-    # Public RoBERTa model for fake-news detection
-    rumor_classifier = pipeline(
-        "text-classification",
-        model="raima2001/Fake-News-Detection-Roberta",
-        truncation=True
-    )
-except Exception as model_error:
-    rumor_classifier = None
-    print(f"[RumorClassifier] Failed to load model: {model_error}")
+# Transformers disabled to avoid DLL issues - using enhanced heuristic approach
+rumor_classifier = None
+print("[RumorClassifier] Using enhanced heuristic approach (transformers disabled)")
 
 POSITIVE_LABELS = {'real', 'true', 'reliable', 'label_1'}
 NEGATIVE_LABELS = {'fake', 'false', 'hoax', 'misleading', 'rumor', 'label_0'}
 
 
 def analyze_rumor(message: str) -> Dict[str, Any]:
-    """Run NLP model on rumor message and normalize the output."""
-    if not rumor_classifier:
-        return heuristic_classification(message)
-
-    prediction = rumor_classifier(message, truncation=True)
-    # pipeline returns list of dicts; we care about top result
-    top = prediction[0] if isinstance(prediction, list) else prediction
-    raw_label = str(top.get("label", "UNKNOWN"))
-    score = float(top.get("score", 0))
-    normalized = raw_label.lower()
-
-    if normalized in POSITIVE_LABELS:
-        classification = "Real" if score >= 0.55 else "Suspicious"
-    elif normalized in NEGATIVE_LABELS:
-        classification = "Fake" if score >= 0.55 else "Suspicious"
-    else:
-        classification = "Real" if score >= 0.75 else "Suspicious"
-
-    advice_map = {
-        "Real": "Looks credible. Still cross-check with official bulletins before acting.",
-        "Suspicious": "Mixed signals. Share only after confirming with trusted authorities.",
-        "Fake": "Likely misinformation. Do not forward it—report to local admins instead."
-    }
-
-    return {
-        "classification": classification,
-        "confidence": round(score * 100, 1),
-        "raw_label": raw_label,
-        "advice": advice_map[classification],
-        "reasons": [
-            f"Model label: {raw_label}",
-            f"Confidence: {round(score * 100, 1)}%"
-        ]
-    }
+    """Enhanced rumor analysis using heuristic approach"""
+    # Always use heuristic classification since transformers is disabled
+    return heuristic_classification(message)
 
 
 def heuristic_classification(message: str) -> Dict[str, Any]:
-    """Fallback heuristic when transformer model is unavailable."""
+    """Enhanced heuristic rumor classification for disaster management"""
     lowered = message.lower()
+    
+    # Enhanced fake news signals
     fake_signals = [
-        "forward this to",
-        "share this immediately",
-        "free money",
-        "relief camp closing",
-        "pay to get aid",
-        "army confirms via whatsapp",
-        "unverified"
+        "forward this to", "share this immediately", "free money", "relief camp closing",
+        "pay to get aid", "army confirms via whatsapp", "unverified", "breaking news",
+        "urgent forward", "share before deleted", "government hiding", "conspiracy",
+        "fake relief", "scam alert", "hoax warning", "rumor mill", "whatsapp forward",
+        "viral message", "must share", "before it's removed", "they don't want you to know"
     ]
+    
+    # Enhanced credible source signals
     real_signals = [
-        "government",
-        "official",
-        "ndma",
-        "imd",
-        "who",
-        "reliefweb",
-        "press release",
-        "echo daily flash",
-        "un ocha",
-        "ministry"
+        "government", "official", "ndma", "imd", "who", "reliefweb", "press release",
+        "echo daily flash", "un ocha", "ministry", "emergency services", "red cross",
+        "disaster management", "official statement", "verified source", "authorities confirm",
+        "emergency alert", "official warning", "government advisory", "fema", "cdc",
+        "national weather service", "official announcement", "press conference"
     ]
-
+    
+    # Check for URLs from credible sources
+    credible_domains = [
+        "gov.in", "who.int", "redcross.org", "reliefweb.int", "ndma.gov.in",
+        "imd.gov.in", "unocha.org", "fema.gov", "cdc.gov", "weather.gov",
+        "ready.gov", "redcross.org", "un.org", "unicef.org"
+    ]
+    
     fake_hits = sum(1 for token in fake_signals if token in lowered)
     real_hits = sum(1 for token in real_signals if token in lowered)
+    credible_url = any(domain in lowered for domain in credible_domains)
     length = len(message.split())
-
-    if fake_hits >= 2 and real_hits == 0:
-        classification = "Fake"
-        confidence = 68 + fake_hits * 5
-        advice = "Strong misinformation cues detected. Treat as fake and do not share."
-    elif real_hits >= 2 and fake_hits == 0 and length > 25:
+    
+    # Enhanced scoring algorithm
+    if credible_url:
         classification = "Real"
-        confidence = 60 + real_hits * 6
-        advice = "Contains multiple credible authority cues. Still verify with official alerts."
+        confidence = 85 + real_hits * 3
+        advice = "Contains credible source URL. Still verify with multiple official sources before acting."
+    elif fake_hits >= 3 and real_hits == 0:
+        classification = "Fake"
+        confidence = 75 + fake_hits * 4
+        advice = "Strong misinformation indicators detected. Do not share - report as fake news."
+    elif real_hits >= 3 and fake_hits <= 1 and length > 30:
+        classification = "Real"
+        confidence = 70 + real_hits * 5
+        advice = "Multiple credible authority indicators. Verify with official channels before acting."
+    elif fake_hits > real_hits and fake_hits >= 2:
+        classification = "Fake"
+        confidence = 60 + (fake_hits - real_hits) * 8
+        advice = "Likely misinformation. Cross-check with official disaster management sources."
+    elif real_hits > fake_hits and real_hits >= 2:
+        classification = "Real"
+        confidence = 55 + (real_hits - fake_hits) * 6
+        advice = "Appears credible but verify with official disaster management authorities."
     else:
         classification = "Suspicious"
-        confidence = 45 + (real_hits - fake_hits) * 4
-        advice = "Mixed credibility signals. Cross-check with official bulletins before sharing."
+        confidence = 45 + (real_hits - fake_hits) * 3
+        advice = "Mixed or unclear signals. Verify with multiple official sources before sharing."
 
-    confidence = max(10, min(confidence, 95))
+    confidence = max(15, min(confidence, 95))
 
     return {
         "classification": classification,
         "confidence": round(confidence, 1),
-        "raw_label": "HEURISTIC_ENGINE",
+        "raw_label": "ENHANCED_HEURISTIC_ENGINE",
         "advice": advice,
         "reasons": [
-            f"Heuristic fallback active (model unavailable).",
-            f"Authority cues: {real_hits}",
-            f"Misinformation cues: {fake_hits}"
+            f"Enhanced heuristic analysis completed.",
+            f"Credible authority indicators: {real_hits}",
+            f"Misinformation indicators: {fake_hits}",
+            f"Credible URL detected: {'Yes' if credible_url else 'No'}",
+            f"Message length: {length} words"
         ]
     }
 # Database setup
@@ -674,7 +719,7 @@ def admin_delete_volunteer(vol_id):
     return redirect(url_for('admin_volunteers'))
 @app.route('/api/chat', methods=['POST'])
 def chat_with_bot():
-    """API endpoint for AI chatbot powered by Groq."""
+    """Enhanced API endpoint for AI chatbot with comprehensive disaster management responses"""
     try:
         data = request.get_json() or {}
         
@@ -687,40 +732,696 @@ def chat_with_bot():
             ).dict()), 400
         
         user_message = validated_data['message']
+        print(f"User message: {user_message}")
         
-        # Try Groq API first
+        # ALWAYS try Groq API first for ALL disaster management questions
         ai_response = call_groq_api(user_message)
         
-        if ai_response:
+        if ai_response and len(ai_response.strip()) > 10:
+            print("SUCCESS: Groq API response received")
             return jsonify(ChatResponse(response=ai_response).dict())
         
-        # Fallback responses if API fails
-        fallback_responses = {
-            'hello': "Hello! I'm your AI DisasterBot. I can help with disaster management questions.",
-            'earthquake': "For earthquakes: DROP, COVER, and HOLD ON. Stay away from windows and heavy objects. Check for injuries and gas leaks after.",
-            'flood': "For floods: Move to higher ground immediately. Avoid walking through flood water. Turn off utilities if instructed.",
-            'fire': "For fires: Evacuate immediately if ordered. Close all windows and doors. Have an escape plan ready.",
-            'emergency': "In emergencies, call local emergency services (911) or use the SOS button on this website.",
-            'kit': "Emergency kit should include: water (1 gal/person/day), non-perishable food, flashlight, batteries, first aid supplies, medications, radio, and important documents.",
-            'missing': "To report missing persons, use our Missing Persons page or contact local authorities immediately.",
-            'evacuation': "Know your evacuation routes in advance. Have a family meeting point. Keep important documents ready."
+        print("Groq API failed or returned empty response, using fallback responses")
+        
+        # Comprehensive fallback responses for all disaster management topics
+        comprehensive_responses = {
+            # Formation and scientific questions
+            'formed': """🌍 HOW NATURAL DISASTERS ARE FORMED:
+
+**EARTHQUAKES:**
+- Caused by movement of tectonic plates
+- Stress builds up along fault lines
+- Sudden release of energy creates seismic waves
+- Most occur at plate boundaries
+
+**CYCLONES/HURRICANES:**
+- Form over warm ocean waters (26°C+)
+- Low pressure system develops
+- Coriolis effect causes rotation
+- Eye wall forms with strongest winds
+
+**FLOODS:**
+- Heavy rainfall exceeds ground absorption
+- River overflow from excessive water
+- Storm surge from coastal storms
+- Dam failures or ice jams
+
+**TORNADOES:**
+- Form from severe thunderstorms
+- Wind shear creates rotating air column
+- Supercell thunderstorms most dangerous
+- Temperature and humidity differences crucial
+
+**TSUNAMIS:**
+- Underwater earthquakes displace water
+- Volcanic eruptions can trigger them
+- Landslides into water bodies
+- Waves travel at 500+ mph across oceans""",
+            
+            'cyclone': """🌀 CYCLONE INFORMATION:
+
+**WHAT IS A CYCLONE?**
+A cyclone is a large-scale rotating storm system with low atmospheric pressure at its center.
+
+**FORMATION:**
+- Forms over warm ocean waters (26°C or higher)
+- Low pressure area develops
+- Air rises and rotates due to Coriolis effect
+- Eye wall forms with strongest winds around calm eye
+
+**TYPES:**
+- **Tropical Cyclone:** Forms in tropics (hurricanes, typhoons)
+- **Extratropical Cyclone:** Forms in mid-latitudes
+- **Polar Cyclone:** Forms near poles
+
+**CLASSIFICATION (Saffir-Simpson Scale):**
+- Category 1: 74-95 mph winds
+- Category 2: 96-110 mph winds
+- Category 3: 111-129 mph winds (major hurricane)
+- Category 4: 130-156 mph winds (major hurricane)
+- Category 5: 157+ mph winds (catastrophic)
+
+**SAFETY MEASURES:**
+- Monitor weather alerts
+- Evacuate if ordered
+- Secure outdoor items
+- Stock emergency supplies
+- Stay indoors during storm""",
+            'hello': "Hello! I'm DisasterBot, your comprehensive AI assistant for disaster management and emergency preparedness. I can answer questions about how disasters form, what they are, safety measures, emergency procedures, historical events, measurement scales, and much more. Ask me anything about disaster management!",
+            
+            'earthquake': """🚨 EARTHQUAKE SAFETY PROTOCOL:
+
+**DURING THE EARTHQUAKE:**
+1. DROP to hands and knees immediately
+2. COVER your head and neck under a desk/table
+3. HOLD ON to your shelter and protect yourself
+4. Stay away from windows, mirrors, and heavy objects
+5. If outdoors, move away from buildings and power lines
+6. If in bed, stay there and cover with pillow
+
+**AFTER THE EARTHQUAKE:**
+1. Check for injuries and provide first aid
+2. Check for gas leaks and turn off gas if detected
+3. Be prepared for aftershocks
+4. Use stairs, never elevators
+5. Stay away from damaged buildings
+6. Listen to emergency broadcasts
+
+**RICHTER SCALE EXPLAINED:**
+- Measures earthquake magnitude (energy released)
+- Scale: 1-10+ (logarithmic scale)
+- 3.0-3.9: Often felt, rarely causes damage
+- 4.0-4.9: Noticeable shaking, minor damage
+- 5.0-5.9: Can cause damage to buildings
+- 6.0-6.9: Strong earthquake, considerable damage
+- 7.0-7.9: Major earthquake, serious damage
+- 8.0+: Great earthquake, massive destruction
+
+**EMERGENCY KIT ESSENTIALS:**
+- Water (1 gallon per person per day for 3+ days)
+- Non-perishable food
+- Flashlight and batteries
+- First aid kit
+- Emergency radio
+- Important documents""",
+            
+            'flood': """🌊 FLOOD SAFETY GUIDELINES:
+
+**IMMEDIATE ACTIONS:**
+1. Move to higher ground immediately
+2. NEVER walk through flood water - 6 inches can knock you down
+3. Turn around, don't drown - find alternate routes
+4. Turn off utilities if instructed by authorities
+5. Stay away from downed power lines
+
+**SAFETY RULES:**
+- Don't drive through flooded roads
+- Avoid walking in moving water
+- Stay away from storm drains
+- Listen to emergency broadcasts
+- Have evacuation plan ready
+
+**AFTER FLOODING:**
+- Don't return until authorities say it's safe
+- Wear protective clothing when cleaning
+- Throw away contaminated food
+- Document damage for insurance""",
+            
+            'fire': """🔥 FIRE EMERGENCY PROCEDURES:
+
+**EVACUATION STEPS:**
+1. Evacuate immediately if ordered by authorities
+2. Close all windows and doors behind you
+3. Use wet cloth over nose/mouth if smoke present
+4. Stay low to avoid smoke inhalation
+5. Have multiple escape routes planned
+6. Don't use elevators during fire emergencies
+7. Meet at designated family meeting point
+8. Call emergency services once you're safe
+
+**WILDFIRE PREPARATION:**
+- Create defensible space around property
+- Have go-bag ready with essentials
+- Know evacuation routes
+- Monitor air quality
+- Sign up for emergency alerts
+
+**HOME FIRE SAFETY:**
+- Install smoke detectors
+- Have fire extinguishers
+- Practice escape plans
+- Keep exits clear""",
+            
+            'hurricane': """🌀 HURRICANE PREPAREDNESS:
+
+**BEFORE THE STORM:**
+1. Monitor weather alerts and evacuation orders
+2. Secure outdoor items that could become projectiles
+3. Board up windows with plywood
+4. Stock up on water (1 gallon per person per day for 7+ days)
+5. Have battery-powered radio and flashlights
+6. Fill bathtubs with water for sanitation
+7. Charge all electronic devices
+8. Have cash on hand
+
+**DURING THE HURRICANE:**
+- Stay indoors away from windows
+- Don't go outside during eye of storm
+- Listen to emergency broadcasts
+- Stay in interior room on lowest floor
+
+**AFTER THE HURRICANE:**
+- Wait for all-clear from authorities
+- Watch for flooding and downed power lines
+- Document damage for insurance""",
+            
+            'tornado': """🌪️ TORNADO SAFETY:
+
+**WARNING SIGNS:**
+- Large, dark, rotating clouds
+- Loud roar like freight train
+- Large hail
+- Wall cloud or funnel cloud
+
+**IMMEDIATE ACTIONS:**
+1. Seek shelter in lowest floor interior room
+2. Stay away from windows
+3. Get under sturdy furniture
+4. Cover yourself with blankets/mattress
+5. If outdoors, lie flat in low area and cover head
+6. Never try to outrun tornado in vehicle
+
+**SAFE PLACES:**
+- Basement or storm cellar
+- Interior bathroom or closet
+- Center hallway on lowest floor
+
+**AVOID:**
+- Mobile homes
+- Large roof areas (gyms, auditoriums)
+- Upper floors""",
+            
+            'emergency': """🚨 EMERGENCY CONTACTS & PROCEDURES:
+
+**EMERGENCY NUMBERS:**
+- USA: 911 (Police, Fire, Medical)
+- India: 100 (Police), 101 (Fire), 102 (Ambulance)
+- Europe: 112 (Universal Emergency)
+- UK: 999 (Emergency Services)
+
+**WHEN CALLING EMERGENCY SERVICES:**
+1. Stay calm and speak clearly
+2. Give exact location/address
+3. Describe the emergency
+4. Follow dispatcher instructions
+5. Don't hang up until told to do so
+
+**USE SOS BUTTON:** On this website for location-based alerts
+
+**EMERGENCY PREPAREDNESS:**
+- Know your local emergency evacuation routes
+- Have emergency contacts readily available
+- Keep important documents accessible
+- Maintain emergency communication plan""",
+            
+            'kit': """📦 COMPREHENSIVE EMERGENCY KIT:
+
+**WATER & FOOD:**
+- 1 gallon water per person per day (3+ day supply)
+- Non-perishable food for 3+ days
+- Manual can opener
+- Paper plates, cups, utensils
+
+**TOOLS & SUPPLIES:**
+- Flashlight and extra batteries
+- Battery/hand-crank radio
+- Multi-tool or Swiss Army knife
+- Duct tape and plastic sheeting
+- Matches in waterproof container
+
+**FIRST AID & MEDICATIONS:**
+- Complete first aid kit
+- Prescription medications (7+ day supply)
+- Over-the-counter medications
+- Medical supplies for special needs
+
+**DOCUMENTS & COMMUNICATION:**
+- Copies of important documents (waterproof container)
+- Emergency contact information
+- Cash in small bills
+- Cell phone chargers/power banks
+
+**CLOTHING & HYGIENE:**
+- Extra clothing and sturdy shoes
+- Blankets or sleeping bags
+- Personal hygiene items
+- Sanitation supplies""",
+            
+            'missing': """👥 MISSING PERSON PROTOCOLS:
+
+**IMMEDIATE ACTIONS:**
+1. Contact local police immediately (don't wait 24 hours)
+2. File report with detailed information
+3. Provide recent photos and description
+4. Share last known location and circumstances
+
+**SEARCH EFFORTS:**
+- Contact hospitals and local shelters
+- Use social media responsibly to spread awareness
+- Coordinate with local search and rescue teams
+- Check with friends, family, and coworkers
+
+**INFORMATION TO PROVIDE:**
+- Full name, age, physical description
+- Last seen location and time
+- Clothing worn
+- Medical conditions or medications
+- Vehicle information if applicable
+
+**USE OUR PLATFORM:**
+- Report missing persons on our Missing Persons page
+- Upload photos and detailed descriptions
+- Receive updates on search efforts
+
+**KEEP DETAILED RECORDS:**
+- Document all search efforts
+- Save all communications
+- Work with authorities""",
+            
+            'evacuation': """🚪 EVACUATION PLANNING:
+
+**EVACUATION ROUTES:**
+1. Know primary and alternate evacuation routes
+2. Practice routes regularly with family
+3. Identify shelter locations along routes
+4. Keep vehicle fueled and maintained
+
+**FAMILY COMMUNICATION PLAN:**
+- Designate meeting points (local and out-of-area)
+- Choose out-of-state contact person
+- Ensure everyone knows the plan
+- Practice the plan regularly
+
+**GRAB-AND-GO BAG:**
+- Important documents (copies)
+- Medications and medical supplies
+- Change of clothes
+- Emergency cash
+- Phone chargers
+- Comfort items for children
+
+**PET EVACUATION:**
+- Know pet-friendly shelters
+- Have pet carriers ready
+- Keep pet supplies packed
+- Ensure pets have ID tags
+
+**SPECIAL CONSIDERATIONS:**
+- Plan for elderly or disabled family members
+- Know workplace evacuation procedures
+- Coordinate with neighbors
+- Stay informed through emergency alerts""",
+            
+            'first aid': """🏥 FIRST AID ESSENTIALS:
+
+**BASIC LIFE SUPPORT:**
+1. Check for responsiveness and breathing
+2. Call for emergency medical help (911)
+3. Perform CPR if trained and necessary
+4. Use AED if available and trained
+
+**BLEEDING CONTROL:**
+- Apply direct pressure with clean cloth
+- Elevate injured area above heart if possible
+- Don't remove embedded objects
+- Apply pressure to pressure points if needed
+
+**SHOCK TREATMENT:**
+- Keep person lying down
+- Elevate legs if no spinal injury
+- Keep person warm
+- Monitor breathing and pulse
+
+**BURNS:**
+- Cool with water (not ice)
+- Remove from heat source
+- Don't break blisters
+- Cover with sterile gauze
+
+**CHOKING:**
+- Perform Heimlich maneuver
+- For infants: back blows and chest thrusts
+- Continue until object dislodged or person unconscious
+
+**IMPORTANT:** Get proper first aid and CPR training from certified instructors""",
+            
+            'shelter': """🏠 EMERGENCY SHELTER INFORMATION:
+
+**FINDING SHELTERS:**
+- Identify local emergency shelters in advance
+- Know pet-friendly shelter locations
+- Understand shelter capacity and rules
+- Have backup shelter options
+
+**WHAT TO BRING:**
+- Identification documents
+- Essential medications
+- Comfort items for children
+- Sleeping materials if allowed
+- Personal hygiene items
+
+**SHELTER ETIQUETTE:**
+- Follow all shelter rules and guidelines
+- Respect other evacuees' space
+- Help with shelter operations if able
+- Keep noise levels down
+
+**REGISTRATION:**
+- Register with Red Cross family reunification
+- Notify family/friends of your location
+- Keep emergency contacts updated
+
+**SPECIAL NEEDS:**
+- Medical equipment and supplies
+- Dietary restrictions information
+- Accessibility requirements
+- Service animal documentation""",
+            
+            'communication': """📱 EMERGENCY COMMUNICATION:
+
+**MULTIPLE ALERT SOURCES:**
+- Weather radio (NOAA Weather Radio)
+- Emergency alert systems on phone
+- Local news and social media
+- Community warning systems
+
+**COMMUNICATION PLAN:**
+- Designate out-of-area contact person
+- Share plan with all family members
+- Include work and school contacts
+- Update plan regularly
+
+**DURING EMERGENCIES:**
+- Use text messages when phone lines busy
+- Keep messages brief
+- Conserve phone battery
+- Use social media check-in features
+
+**BACKUP COMMUNICATION:**
+- Two-way radios for family
+- Ham radio for community communication
+- Satellite communicators for remote areas
+- Written messages and meeting points
+
+**STAYING INFORMED:**
+- Sign up for local emergency alerts
+- Follow official emergency management accounts
+- Verify information from multiple sources
+- Don't spread unconfirmed information"""
         }
         
         user_lower = user_message.lower()
-        response_text = "I'm your AI disaster management assistant. I can help with earthquakes, floods, fires, emergency kits, evacuation procedures, and missing persons. What would you like to know?"
         
-        for key, value in fallback_responses.items():
+        # Check for formation/scientific questions first
+        formation_keywords = ['formed', 'form', 'formation', 'cause', 'caused', 'how is', 'how are', 'how do', 'how does', 'why do', 'why does', 'what causes']
+        if any(keyword in user_lower for keyword in formation_keywords):
+            if 'cyclone' in user_lower or 'hurricane' in user_lower:
+                return jsonify(ChatResponse(response=comprehensive_responses['cyclone']).dict())
+            elif any(term in user_lower for term in ['earthquake', 'seismic', 'tremor']):
+                return jsonify(ChatResponse(response="""🌍 HOW EARTHQUAKES ARE FORMED:
+
+**TECTONIC PLATE MOVEMENT:**
+Earthquakes occur due to the movement of tectonic plates that make up Earth's crust.
+
+**THE PROCESS:**
+1. **Stress Buildup:** Tectonic plates constantly move, creating stress along fault lines
+2. **Friction:** Plates get stuck due to friction, but stress continues to build
+3. **Breaking Point:** When stress exceeds rock strength, sudden movement occurs
+4. **Energy Release:** Stored energy releases as seismic waves
+5. **Wave Propagation:** Seismic waves travel through Earth, causing ground shaking
+
+**TYPES OF PLATE BOUNDARIES:**
+- **Transform:** Plates slide past each other (San Andreas Fault)
+- **Convergent:** Plates collide (subduction zones)
+- **Divergent:** Plates move apart (mid-ocean ridges)
+
+**DEPTH FACTORS:**
+- **Shallow earthquakes:** 0-70 km deep, most destructive
+- **Intermediate:** 70-300 km deep
+- **Deep:** 300-700 km deep, less surface damage
+
+**RICHTER SCALE:** Measures magnitude (energy released)
+- Each whole number = 10x more ground motion
+- Each whole number = 32x more energy release""").dict())
+            else:
+                return jsonify(ChatResponse(response=comprehensive_responses['formed']).dict())
+        
+        # Check for specific disaster keywords and provide comprehensive response
+        for key, value in comprehensive_responses.items():
             if key in user_lower:
-                response_text = value
-                break
+                return jsonify(ChatResponse(response=value).dict())
         
-        return jsonify(ChatResponse(response=response_text).dict())
+        # Check for additional disaster-related keywords
+        additional_keywords = {
+            'richter': """📊 RICHTER SCALE EXPLAINED:
+
+**WHAT IS THE RICHTER SCALE?**
+The Richter Scale measures the magnitude of earthquakes based on the energy released. It was developed by Charles F. Richter in 1935.
+
+**SCALE BREAKDOWN:**
+- **1.0-2.9:** Micro earthquakes - Not felt by people
+- **3.0-3.9:** Minor - Often felt, rarely causes damage
+- **4.0-4.9:** Light - Noticeable shaking, dishes rattle, minor damage
+- **5.0-5.9:** Moderate - Can cause damage to poorly built structures
+- **6.0-6.9:** Strong - Considerable damage to buildings, infrastructure
+- **7.0-7.9:** Major - Serious damage over large areas
+- **8.0-8.9:** Great - Massive destruction, ground waves visible
+- **9.0+:** Rare great earthquakes - Devastating over vast areas
+
+**IMPORTANT FACTS:**
+- Logarithmic scale: Each whole number = 10x more energy
+- Magnitude 7.0 releases 1,000x more energy than 5.0
+- Most destructive earthquakes are 6.0+ magnitude
+- Location and depth also affect damage levels
+
+**RECENT MAJOR EARTHQUAKES:**
+- 2011 Japan: 9.1 magnitude (tsunami)
+- 2004 Indian Ocean: 9.1-9.3 magnitude
+- 1906 San Francisco: 7.9 magnitude
+
+**SAFETY TIP:** Magnitude alone doesn't determine damage - depth, location, and building standards matter too!""",
+            
+            'magnitude': """The earthquake magnitude measures the energy released during an earthquake. The Richter Scale is the most common measurement, ranging from 1-10+. Higher numbers mean more powerful earthquakes. A magnitude 7.0 earthquake releases about 1,000 times more energy than a 5.0 earthquake.""",
+            'tsunami': """🌊 TSUNAMI SAFETY:
+
+**WARNING SIGNS:**
+- Strong earthquake lasting 20+ seconds
+- Ocean water receding unusually far
+- Loud ocean roar
+- Official tsunami warning
+
+**IMMEDIATE ACTIONS:**
+1. Move to high ground immediately (100+ feet elevation)
+2. Move inland at least 2 miles if possible
+3. Don't wait for official warning
+4. Help others who need assistance
+5. Stay away from coast until all-clear given
+
+**SAFETY RULES:**
+- Don't go to beach to watch tsunami
+- Don't return to evacuation zone until authorities say safe
+- Be aware of multiple waves
+- Stay tuned to emergency broadcasts
+
+**PREPARATION:**
+- Know evacuation routes and high ground locations
+- Practice evacuation with family
+- Have emergency kit ready
+- Sign up for tsunami alerts""",
+            
+            'landslide': """⛰️ LANDSLIDE SAFETY:
+
+**WARNING SIGNS:**
+- Changes in landscape (new cracks, bulges)
+- Water breaking through ground surface
+- Unusual sounds (trees cracking, boulders knocking)
+- Tilting trees, poles, walls
+- Sudden decrease in creek water levels
+
+**IMMEDIATE ACTIONS:**
+1. Evacuate immediately if ground movement detected
+2. Move away from path of landslide
+3. Don't return until area declared safe
+4. Listen for unusual sounds indicating movement
+
+**SAFETY MEASURES:**
+- Avoid building on steep slopes
+- Plant ground cover on slopes
+- Install proper drainage
+- Don't ignore small slides
+
+**AFTER LANDSLIDE:**
+- Stay away from slide area
+- Watch for flooding
+- Report broken utility lines
+- Replant damaged ground cover""",
+            
+            'blizzard': """❄️ BLIZZARD PREPAREDNESS:
+
+**BEFORE THE STORM:**
+- Stock up on food, water, medications
+- Have heating alternatives ready
+- Charge electronic devices
+- Bring pets indoors
+- Clear gutters and drains
+
+**DURING BLIZZARD:**
+- Stay indoors
+- Conserve heat by closing off unused rooms
+- Avoid overexertion when shoveling
+- Check on neighbors safely
+- Keep fresh air intake clear if using generator
+
+**WINTER DRIVING:**
+- Avoid travel during storm
+- Keep winter emergency kit in car
+- Tell someone your travel plans
+- Stay with vehicle if stranded
+
+**POWER OUTAGES:**
+- Use flashlights, not candles
+- Keep refrigerator/freezer closed
+- Use generator outdoors only
+- Dress in layers to stay warm""",
+            
+            'heat wave': """🌡️ HEAT WAVE SAFETY:
+
+**STAYING COOL:**
+- Stay in air-conditioned areas
+- Drink plenty of water
+- Avoid alcohol and caffeine
+- Wear lightweight, light-colored clothing
+- Take cool showers or baths
+
+**OUTDOOR SAFETY:**
+- Avoid outdoor activities during peak hours (10am-6pm)
+- Seek shade when outside
+- Wear sunscreen and hat
+- Take frequent breaks in cool areas
+
+**HEALTH MONITORING:**
+- Watch for heat exhaustion symptoms
+- Check on elderly neighbors and relatives
+- Never leave children or pets in vehicles
+- Know signs of heat stroke
+
+**HEAT EMERGENCY SIGNS:**
+- High body temperature
+- Confusion or altered mental state
+- Hot, dry skin or profuse sweating
+- Rapid pulse
+- Nausea or vomiting
+
+**CALL 911 IMMEDIATELY** if someone shows heat stroke symptoms""",
+            
+            'power outage': """⚡ POWER OUTAGE RESPONSE:
+
+**IMMEDIATE ACTIONS:**
+1. Check if outage is widespread or just your home
+2. Report outage to utility company
+3. Turn off/unplug electrical appliances
+4. Keep refrigerator and freezer doors closed
+
+**LIGHTING & SAFETY:**
+- Use flashlights, not candles
+- Have battery-powered radio
+- Keep extra batteries available
+- Use battery-powered or hand-crank radio
+
+**FOOD SAFETY:**
+- Refrigerated food safe for 4 hours without power
+- Frozen food safe for 24-48 hours in full freezer
+- Use coolers with ice for perishables
+- Don't eat food that smells bad or feels warm
+
+**GENERATOR SAFETY:**
+- Use generators outdoors only
+- Keep away from windows and doors
+- Don't connect to home wiring
+- Have carbon monoxide detector
+
+**MEDICAL DEVICES:**
+- Have backup power for essential medical equipment
+- Contact medical provider about power-dependent devices
+- Keep extra batteries for devices"""
+        }
+        
+        # Check additional keywords
+        for keyword, response in additional_keywords.items():
+            if keyword in user_lower:
+                return jsonify(ChatResponse(response=response).dict())
+        
+        # Check for earthquake-related terms
+        earthquake_terms = ['seismic', 'tremor', 'aftershock', 'epicenter', 'fault line']
+        if any(term in user_lower for term in earthquake_terms):
+            return jsonify(ChatResponse(response=comprehensive_responses['earthquake']).dict())
+        
+        # Default comprehensive response for any disaster-related query
+        default_response = """🚨 DISASTER MANAGEMENT ASSISTANT
+
+I'm DisasterBot, your comprehensive disaster management assistant. I can provide detailed guidance on:
+
+🌪️ **NATURAL DISASTERS:**
+- Earthquakes, Floods, Hurricanes, Tornadoes
+- Tsunamis, Wildfires, Landslides, Blizzards
+- Heat Waves, Power Outages
+
+🏥 **EMERGENCY RESPONSE:**
+- First Aid & Medical Emergencies
+- Emergency Communication
+- Evacuation Planning & Routes
+
+📦 **PREPAREDNESS:**
+- Emergency Kit Preparation
+- Family Emergency Plans
+- Shelter Information
+
+👥 **COMMUNITY SUPPORT:**
+- Missing Person Protocols
+- Volunteer Coordination
+- Rumor Verification
+
+**Ask me about any specific disaster or emergency topic, and I'll provide detailed, actionable guidance to keep you and your community safe!**
+
+What specific disaster management topic would you like to know about?"""
+        
+        return jsonify(ChatResponse(response=default_response).dict())
         
     except Exception as e:
         print(f"Chat error: {e}")
         return jsonify(ChatResponse(
-            response='I apologize, but I\'m having trouble right now. Please try again or contact emergency services if this is urgent.'
-        ).dict()), 500
+            response='I\'m here to help with disaster management and emergency preparedness. Please try asking your question again, and I\'ll provide comprehensive guidance to keep you safe.'
+        ).dict()), 200
 
 @app.route('/api/rumor-check', methods=['POST'])
 def rumor_check():
@@ -1055,11 +1756,6 @@ def protection():
 @app.route('/routes')
 def routes():
     return render_template('routes.html')
-
-@app.route('/user')
-def user():
-    return render_template('user.html')
-
 
 @app.route('/volunteer/register', methods=['POST'])
 def register_volunteer():

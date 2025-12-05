@@ -348,46 +348,117 @@
             100% { transform: rotate(360deg); }
         }
         
-        /* Route styling */
+        /* Enhanced Route styling */
         .route-info {
-            background: white;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 25px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.12);
+            border: 1px solid #e9ecef;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .route-info::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--accent), var(--success));
         }
         
         .route-info h3 {
             color: var(--primary);
-            margin-bottom: 10px;
+            margin-bottom: 15px;
+            font-size: 1.3rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .route-info h3::before {
+            content: '🗺️';
+            font-size: 1.2rem;
         }
         
         .route-details {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 10px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 15px;
+            padding: 15px;
+            background: rgba(52, 152, 219, 0.05);
+            border-radius: 8px;
+            border-left: 4px solid var(--accent);
         }
         
         .route-distance, .route-time {
             font-weight: bold;
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
         
         .route-distance {
             color: var(--accent);
         }
         
+        .route-distance::before {
+            content: '📏';
+        }
+        
         .route-time {
             color: var(--success);
         }
         
+        .route-time::before {
+            content: '⏱️';
+        }
+        
         .route-steps {
-            margin-top: 10px;
-            padding-left: 20px;
+            margin-top: 15px;
+            padding-left: 0;
+            list-style: none;
         }
         
         .route-steps li {
-            margin-bottom: 5px;
+            margin-bottom: 10px;
+            padding: 10px 15px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            border-left: 3px solid var(--accent);
+            position: relative;
+            padding-left: 45px;
         }
+        
+        .route-steps li::before {
+            content: counter(step-counter);
+            counter-increment: step-counter;
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: var(--accent);
+            color: white;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+        
+        .route-steps {
+            counter-reset: step-counter;
+        }
+        
+
         
         /* Location-specific styles */
         #refresh-location-btn {
@@ -539,8 +610,8 @@
             <div class="route-info">
                 <h3>Recommended Evacuation Route</h3>
                 <div class="route-details">
-                    <span class="route-distance">Distance: <span id="route-distance">5.2 km</span></span>
-                    <span class="route-time">Estimated Time: <span id="route-time">15 min</span></span>
+                    <div class="route-distance">Distance: <span id="route-distance">5.2 km</span></div>
+                    <div class="route-time">Estimated Time: <span id="route-time">15 min</span></div>
                 </div>
                 <ol class="route-steps" id="route-steps">
                     <!-- Route steps will be populated by JavaScript -->
@@ -550,6 +621,7 @@
         
         <div id="map-container">
             <div id="map"></div>
+
         </div>
         
         <div class="loading" id="loading-indicator">
@@ -560,31 +632,7 @@
         <div class="shelter-list" id="shelter-results">
             <h2>Nearest Emergency Shelters</h2>
             <div class="shelter-grid" id="shelter-grid">
-                <!-- Shelter cards will be populated by JavaScript -->
-                <div class="shelter-card">
-                    <div class="shelter-name">Delhi Disaster Relief Shelter</div>
-                    <div class="shelter-address">Rajiv Chowk, Connaught Place, New Delhi</div>
-                    <div class="shelter-meta">
-                        <span class="shelter-distance">0.5 km away</span>
-                        <span class="shelter-capacity">Capacity: 120/150</span>
-                    </div>
-                </div>
-                <div class="shelter-card">
-                    <div class="shelter-name">Red Cross Emergency Center</div>
-                    <div class="shelter-address">Barakhamba Road, New Delhi</div>
-                    <div class="shelter-meta">
-                        <span class="shelter-distance">1.2 km away</span>
-                        <span class="shelter-capacity">Capacity: 85/200</span>
-                    </div>
-                </div>
-                <div class="shelter-card">
-                    <div class="shelter-name">NDMA Relief Camp</div>
-                    <div class="shelter-address">Jantar Mantar Road, New Delhi</div>
-                    <div class="shelter-meta">
-                        <span class="shelter-distance">1.8 km away</span>
-                        <span class="shelter-capacity">Capacity: 45/100</span>
-                    </div>
-                </div>
+                <!-- Shelter cards will be populated dynamically by JavaScript -->
             </div>
         </div>
         
@@ -598,87 +646,19 @@
             </div>
             
             <div class="resource-content active" id="medical-content">
-                <div class="resource-item">
-                    <div class="resource-info">
-                        <h4>AIIMS Hospital</h4>
-                        <p>24/7 Emergency Services | 3.5 km away</p>
-                    </div>
-                    <div class="resource-action">
-                        <button class="btn">Get Directions</button>
-                    </div>
-                </div>
-                <div class="resource-item">
-                    <div class="resource-info">
-                        <h4>Safdarjung Hospital</h4>
-                        <p>24/7 Emergency Services | 4.2 km away</p>
-                    </div>
-                    <div class="resource-action">
-                        <button class="btn">Get Directions</button>
-                    </div>
-                </div>
+                <!-- Medical resources will be populated dynamically -->
             </div>
             
             <div class="resource-content" id="rescue-content">
-                <div class="resource-item">
-                    <div class="resource-info">
-                        <h4>Delhi Fire Station</h4>
-                        <p>24/7 Emergency Response | 1.5 km away</p>
-                    </div>
-                    <div class="resource-action">
-                        <button class="btn">Get Directions</button>
-                    </div>
-                </div>
-                <div class="resource-item">
-                    <div class="resource-info">
-                        <h4>NDRF Unit Delhi</h4>
-                        <p>Disaster Response Team | 5.8 km away</p>
-                    </div>
-                    <div class="resource-action">
-                        <button class="btn">Get Directions</button>
-                    </div>
-                </div>
+                <!-- Rescue services will be populated dynamically -->
             </div>
             
             <div class="resource-content" id="food-content">
-                <div class="resource-item">
-                    <div class="resource-info">
-                        <h4>Red Cross Food Distribution</h4>
-                        <p>Daily meals available | 2.1 km away</p>
-                    </div>
-                    <div class="resource-action">
-                        <button class="btn">Get Directions</button>
-                    </div>
-                </div>
-                <div class="resource-item">
-                    <div class="resource-info">
-                        <h4>Gurudwara Bangla Sahib</h4>
-                        <p>Community Kitchen | 1.0 km away</p>
-                    </div>
-                    <div class="resource-action">
-                        <button class="btn">Get Directions</button>
-                    </div>
-                </div>
+                <!-- Food & water resources will be populated dynamically -->
             </div>
             
             <div class="resource-content" id="shelter-content">
-                <div class="resource-item">
-                    <div class="resource-info">
-                        <h4>Delhi Disaster Relief Shelter</h4>
-                        <p>Open 24/7 during emergencies | 0.5 km away</p>
-                    </div>
-                    <div class="resource-action">
-                        <button class="btn">Get Directions</button>
-                    </div>
-                </div>
-                <div class="resource-item">
-                    <div class="resource-info">
-                        <h4>Yamuna Sports Complex</h4>
-                        <p>Emergency Shelter | 6.3 km away</p>
-                    </div>
-                    <div class="resource-action">
-                        <button class="btn">Get Directions</button>
-                    </div>
-                </div>
+                <!-- Shelter facilities will be populated dynamically -->
             </div>
         </div>
     </div>
@@ -1374,7 +1354,8 @@
                         distance: distance,
                         phone: resource.tags.phone || resource.tags['contact:phone'] || 'N/A',
                         lat: lat,
-                        lng: lng
+                        lng: lng,
+                        type: resource.tags.amenity || resource.tags.healthcare || 'facility'
                     };
                 })
                 .sort((a, b) => a.distance - b.distance)
@@ -1417,6 +1398,8 @@
             
             return 'Address details not available';
         }
+        
+
         
         // Update resource tab with real data
         function updateResourceTab(tabType, resources, locationName, fromCoords) {
